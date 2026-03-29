@@ -45,32 +45,32 @@ The GDD is large (~20 sections). Don't read the whole thing every session. Inste
 ## Development Order
 Follow this sequence. Each step should be a working, testable increment:
 
-1. ✅/🔲 Project scaffolding (Vite + React + TS + PixiJS + Zustand + Tailwind)
-2. ✅/🔲 Basic canvas (PixiJS Stage in React, pan/zoom camera)
-3. ✅/🔲 Grid system (tile grid, floor plan rendering, cell selection)
-4. ✅/🔲 Room placement (build palette, drag-to-place, validation, snapping)
-5. ✅/🔲 Time system (day counter, speed controls, pause)
-6. ✅/🔲 Property system (selection screen, purchase flow)
-7. ✅/🔲 Economy basics (bank balance, construction costs)
-8. ✅/🔲 Show system (generation, picker UI, archetypes)
-9. ✅/🔲 Audition system (candidates, casting UI)
-10. ✅/🔲 Crew hiring (roles, hiring panel, salaries)
-11. ✅/🔲 Rehearsal system (readiness meter, events)
-12. ✅/🔲 Marketing (options, buzz score)
-13. ✅/🔲 Performance system (nightly loop, attendance, revenue)
-14. ✅/🔲 Event system (random events, modals, consequences)
-15. ✅/🔲 Run management (price adjustment, end conditions, summary)
-16. ✅/🔲 Save system (serialize, localStorage, slots, auto-save)
-17. ✅/🔲 Full loop integration (connect all phases, test full playthrough)
-18. ✅/🔲 UI polish (dashboards, graphs, notifications, tooltips)
+1. ✅ Project scaffolding (Vite + React + TS + PixiJS + Zustand + Tailwind)
+2. ✅ Basic canvas (PixiJS Stage in React, pan/zoom camera)
+3. ✅ Grid system (tile grid, floor plan rendering, cell selection)
+4. ✅ Room placement (build palette, drag-to-place, validation, snapping)
+5. ✅ Time system (day counter, speed controls, pause)
+6. ✅ Property system (selection screen, purchase flow)
+7. ✅ Economy basics (bank balance, construction costs)
+8. ✅ Show system (generation, picker UI, archetypes)
+9. ✅ Audition system (candidates, casting UI)
+10. ✅ Crew hiring (roles, hiring panel, salaries)
+11. ✅ Rehearsal system (readiness meter, events)
+12. ✅ Marketing (options, buzz score)
+13. ✅ Performance system (nightly loop, attendance, revenue)
+14. ✅ Event system (random events, modals, consequences)
+15. ✅ Run management (price adjustment, end conditions, summary)
+16. ✅ Save system (serialize, localStorage, slots, auto-save)
+17. ✅ Full loop integration (connect all phases, test full playthrough)
+18. 🔲 UI polish (dashboards, graphs, notifications, tooltips)
 
 Mark ✅ as each step completes.
 
 ## Current State
-- **Phase:** Pre-development
-- **Last completed:** GDD written and approved
+- **Phase:** Playable MVP
+- **Last completed:** Step 17 — Full loop integration
 - **Current blocker:** None
-- **Next priority:** Step 1 — Project scaffolding
+- **Next priority:** Step 18 — UI polish (dashboards, graphs, notifications, tooltips)
 
 ## GDD Updates Needed
 If implementation reveals a design issue, do NOT change the GDD. Instead:
@@ -86,6 +86,8 @@ If implementation reveals a design issue, do NOT change the GDD. Instead:
 ## Session Log
 - **2026-03-28:** GDD v1.0 written and approved. CLAUDE.md created. Project ready for scaffolding.
 - **2026-03-28:** GDD v1.0 re-drafted (previous version lost from chat context). Full 18-section GDD at `docs/BROADWAY_TYCOON_GDD.md`. Pending Dixon review before scaffolding.
+- **2026-03-28:** Step 1 complete. Vite + React 19 + TS + PixiJS v8 + @pixi/react + Zustand v5 + Tailwind v4 scaffolded. 13 Zustand slices, full type system, all balance constants. Dev server running at localhost:5173. Build passes clean.
+- **2026-03-28:** Steps 2-17 complete in one session. Consolidated project from Desktop duplicates to ~/Documents/Claude Projects/Code/broadway-tycoon/. Complete GDD (1469 lines, 18 sections) restored. All systems built: canvas+camera, grid+tiles, room placement+validation, time system, property selection, economy, show generation+picker, auditions+casting, crew hiring, rehearsal system, marketing campaigns, nightly performance loop, event system (15 events), run management, save/load (5 slots + autosave), full game loop integration with phase transitions, toast notifications, keyboard shortcuts. Build passes clean. Game is playable end-to-end.
 
 ## Dev Server
 - Command: `npm run dev`

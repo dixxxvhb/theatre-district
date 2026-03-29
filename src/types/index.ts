@@ -1,204 +1,373 @@
-import type { GamePhase, RoomType, ShowGenre, ShowArchetype, PropertyCondition, CrewRole, GameSpeed } from './enums'
+// Core game types for Broadway Tycoon
 
-export type { GamePhase, RoomType, ShowGenre, ShowArchetype, PropertyCondition, CrewRole, GameSpeed }
+export type GamePhase =
+  | 'menu'
+  | 'property_select'
+  | 'building'
+  | 'production'
+  | 'audition'
+  | 'rehearsal'
+  | 'running'
+  | 'summary';
 
-// ─── Property ────────────────────────────────────────────────────────────────
+export type ViewMode = 'isometric' | 'floorplan';
 
-export interface Property {
-  id: string
-  name: string
-  gridWidth: number
-  gridHeight: number
-  price: number
-  condition: PropertyCondition
-  locationBonus: {
-    attendance: number   // multiplier added to base (0.0–0.3)
-    ticketPrice: number  // multiplier added to base (0.0–0.15)
-  }
-  maxSeats: number
-  requiredReputation: number
+export type RoomType =
+  | 'stage'
+  | 'seating'
+  | 'lobby'
+  | 'backstage'
+  | 'box_office'
+  | 'rehearsal_hall'
+  | 'dressing_room'
+  | 'orchestra_pit'
+  | 'storage'
+  | 'office'
+  | 'vip_lounge'
+  | 'concession'
+  | 'tech_booth'
+  | 'green_room'
+  | 'restrooms';
+
+export type PropertyCondition = 'poor' | 'fair' | 'good' | 'excellent' | 'pristine';
+
+export interface LocationBonus {
+  attendance: number;   // percentage bonus, e.g. 0.05 = +5%
+  ticketPrice: number;  // percentage bonus, e.g. 0.10 = +10%
 }
 
-// ─── Grid / Building ──────────────────────────────────────────────────────────
+export interface RoomDefinition {
+  type: RoomType;
+  name: string;
+  description: string;
+  minSize: Size;
+  baseCost: number;
+  buildDays: number;
+  required: boolean;
+  color: string;        // hex color for floor plan rendering
+}
 
-export type CellType = 'empty' | 'room' | 'wall' | 'door'
+export type ShowGenre =
+  | 'musical'
+  | 'play'
+  | 'revival'
+  | 'experimental'
+  | 'one_person_show';
 
-export interface GridCell {
-  x: number
-  y: number
-  roomId: string | null
-  type: CellType
-  walkable: boolean
+export type ShowArchetypeName =
+  | 'crowd_pleaser'
+  | 'critics_darling'
+  | 'big_spectacle'
+  | 'intimate_chamber'
+  | 'dark_horse'
+  | 'safe_bet';
+
+export interface ShowArchetype {
+  name: ShowArchetypeName;
+  label: string;
+  scriptQualityRange: [number, number];
+  appealRange: [number, number];
+  complexityRange: [number, number];
+  castSizeRange: [number, number];
+  budgetRange: [number, number];
+}
+
+export type CrewRole =
+  | 'director'
+  | 'stage_manager'
+  | 'music_director'
+  | 'choreographer'
+  | 'tech_director'
+  | 'costume_designer'
+  | 'lighting_designer'
+  | 'sound_designer'
+  | 'set_designer'
+  | 'publicist'
+  | 'house_manager';
+
+export type MarketingOption =
+  | 'poster'
+  | 'radio_ad'
+  | 'newspaper_ad'
+  | 'social_media'
+  | 'tv_ad'
+  | 'billboard';
+
+export type EventSeverity = 'minor' | 'moderate' | 'major';
+
+export type SpeedSetting = 'paused' | 'normal' | 'fast' | 'ultra';
+
+// ---- Data Models ----
+
+export interface Position {
+  x: number;
+  y: number;
+}
+
+export interface Size {
+  width: number;
+  height: number;
 }
 
 export interface Room {
-  id: string
-  type: RoomType
-  x: number           // grid col of top-left corner
-  y: number           // grid row of top-left corner
-  width: number       // in cells
-  height: number      // in cells
-  upgradeTier: number // 0 = base, 1–3 = upgrade levels
-  constructionDaysLeft: number // 0 = complete
-  propertyId: string
+  id: string;
+  type: RoomType;
+  position: Position;
+  size: Size;
+  level: number;          // upgrade level 1-3
+  condition: number;      // 0-100
+  isConstructing: boolean;
+  constructionDaysLeft: number;
 }
 
-// ─── Show ─────────────────────────────────────────────────────────────────────
-
-export type ShowStatus = 'available' | 'in_production' | 'running' | 'closed'
-
-export interface Show {
-  id: string
-  title: string
-  genre: ShowGenre
-  archetype: ShowArchetype
-  scriptQuality: number   // 1–100
-  audienceAppeal: number  // 1–100
-  complexity: number      // 1–5
-  castSize: number
-  idealBudget: number
-  actualBudget: number
-  quality: number         // calculated after rehearsal
-  status: ShowStatus
+export interface Property {
+  id: string;
+  name: string;
+  address: string;
+  lot: 'small' | 'medium' | 'large';
+  cost: number;
+  gridSize: Size;
+  locationBonus: LocationBonus;
+  condition: PropertyCondition;
+  constructionCostModifier: number; // e.g. 1.5 for poor, 0.8 for pristine
+  maxSeats: number;
+  unlockReputation: number;         // min reputation to purchase
+  rooms: Room[];
+  purchased: boolean;
 }
-
-// ─── Cast ─────────────────────────────────────────────────────────────────────
 
 export interface CastMember {
-  id: string
-  name: string
-  skill: number        // 1–100
-  starPower: number    // 0–50
-  salary: number       // weekly
-  chemistry: number    // 0–100 (per-show fit)
-  reliability: number  // 0–100
-  morale: number       // 0–100
-  quirk: string | null
-  roleIndex: number
-  showId: string
+  id: string;
+  name: string;
+  talent: number;         // 0-100
+  starPower: number;      // 0-100
+  salary: number;         // weekly
+  morale: number;         // 0-100
+  chemistry: number;      // 0-100, with current cast
+  roleId: string;
 }
 
-// ─── Crew ─────────────────────────────────────────────────────────────────────
+export interface ShowRole {
+  id: string;
+  name: string;
+  type: 'lead' | 'supporting' | 'ensemble';
+  castMemberId: string | null;
+}
+
+export interface Show {
+  id: string;
+  title: string;
+  genre: ShowGenre;
+  archetype: ShowArchetypeName;
+  scriptQuality: number;    // 0-100
+  audienceAppeal: number;   // 0-100
+  complexity: number;       // 1-5
+  idealCastSize: number;
+  idealBudget: number;
+  commissioned: boolean;
+  commissionDeliveryDay: number | null;
+  roles: ShowRole[];
+  quality: number;          // 0-100
+  rehearsalProgress: number; // 0-100
+  rehearsalDaysTotal: number;
+  rehearsalDaysCompleted: number;
+  isRehearsing: boolean;
+  isRunning: boolean;
+  openingNight: number | null; // day number
+  closingNight: number | null;
+  totalRevenue: number;
+  totalPerformances: number;
+  averageAttendance: number;
+  criticScore: number | null;
+  buzzScore: number;
+}
 
 export interface CrewMember {
-  id: string
-  name: string
-  role: CrewRole
-  skill: number        // 1–100
-  salary: number       // weekly
-  morale: number       // 0–100
-  experience: number   // 0–100
-}
-
-// ─── Events ──────────────────────────────────────────────────────────────────
-
-export type EventEffectType =
-  | 'money'
-  | 'reputation'
-  | 'buzz'
-  | 'morale_cast'
-  | 'morale_crew'
-  | 'quality'
-  | 'attendance'
-
-export interface EventEffect {
-  type: EventEffectType
-  value: number
-  duration?: number  // days if temporary
-}
-
-export interface EventOption {
-  label: string
-  description: string
-  effects: EventEffect[]
+  id: string;
+  name: string;
+  role: CrewRole;
+  skill: number;          // 0-100
+  salary: number;         // weekly
+  morale: number;         // 0-100
+  hired: boolean;
 }
 
 export interface GameEvent {
-  id: string
-  templateId: string
-  title: string
-  description: string
-  options: EventOption[]
-  resolved: boolean
-  dayOccurred: number
+  id: string;
+  title: string;
+  description: string;
+  severity: EventSeverity;
+  day: number;
+  choices: EventChoice[];
+  resolved: boolean;
 }
 
-// ─── Economy ──────────────────────────────────────────────────────────────────
+export interface EventChoice {
+  id: string;
+  text: string;
+  effects: EventEffect[];
+}
+
+export interface EventEffect {
+  type: 'cash' | 'reputation' | 'buzz' | 'morale' | 'quality';
+  value: number;
+}
+
+export interface PerformanceResult {
+  day: number;
+  attendance: number;
+  capacity: number;
+  revenue: number;
+  expenses: number;
+  profit: number;
+}
+
+export interface SaveSlot {
+  id: string;
+  name: string;
+  timestamp: number;
+  day: number;
+  cash: number;
+  reputation: number;
+  theaterName: string;
+}
+
+// ---- Grid ----
+
+export type CellType = 'empty' | 'room' | 'wall' | 'door';
+
+export interface GridCell {
+  type: CellType;
+  roomId: string | null;
+  roomType: RoomType | null;
+  walkable: boolean;
+}
+
+export interface GridState {
+  width: number;
+  height: number;
+  cells: GridCell[];
+}
+
+// ---- Store State ----
+
+export interface TimeState {
+  day: number;
+  week: number;
+  speed: SpeedSetting;
+  isPaused: boolean;
+  tickAccumulator: number;
+}
+
+export interface EconomyState {
+  cash: number;
+  income: number;         // weekly
+  expenses: number;       // weekly
+  loanBalance: number;
+  loanInterestRate: number;
+  transactionHistory: Transaction[];
+}
 
 export interface Transaction {
-  day: number
-  amount: number       // positive = income, negative = expense
-  category: string
-  description: string
+  id: string;
+  day: number;
+  amount: number;
+  category: string;
+  description: string;
 }
 
-export interface Loan {
-  id: string
-  principal: number
-  totalRepayment: number
-  dailyPayment: number
-  daysRemaining: number
+export interface ReputationState {
+  score: number;
+  level: string;
+  milestones: string[];
 }
 
-// ─── Runs / Stats ─────────────────────────────────────────────────────────────
-
-export type ReviewTier = 'devastating' | 'negative' | 'mixed' | 'positive' | 'glowing'
-
-export interface CriticReview {
-  score: number
-  tier: ReviewTier
-  dayPublished: number
+export interface UIState {
+  currentPhase: GamePhase;
+  viewMode: ViewMode;
+  selectedRoomType: RoomType | null;
+  selectedTile: Position | null;
+  isPanelOpen: boolean;
+  activePanel: string | null;
+  notifications: Notification[];
 }
 
-export interface RunStats {
-  showId: string
-  totalPerformances: number
-  totalRevenue: number
-  totalExpenses: number
-  totalProfit: number
-  avgAttendance: number
-  peakAttendance: number
-  criticReviews: CriticReview[]
+export interface Notification {
+  id: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  day: number;
+  read: boolean;
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
-
-export interface GameSettings {
-  musicVolume: number
-  sfxVolume: number
-  autoSaveEnabled: boolean
-  showTooltips: boolean
-  defaultSpeed: GameSpeed
+export interface MarketingCampaignState {
+  id: string;
+  type: MarketingOption;
+  label: string;
+  cost: number;
+  buzzGain: number;
+  duration: number;
+  daysRemaining: number;
+  startDay: number;
 }
 
-// ─── Full game state (mirrors store shape, used for save serialization) ───────
+export interface RehearsalLogEntry {
+  id: string;
+  day: number;
+  message: string;
+  type: 'progress' | 'breakthrough' | 'conflict' | 'injury';
+}
+
+export interface RunSummary {
+  showTitle: string;
+  totalPerformances: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  profit: number;
+  averageAttendancePercent: number;
+  bestNight: PerformanceResult | null;
+  worstNight: PerformanceResult | null;
+  reputationChange: number;
+  runDays: number;
+}
 
 export interface GameState {
-  companyName: string
-  phase: GamePhase
-  day: number
-  speed: GameSpeed
-  paused: boolean
-  balance: number
-  transactions: Transaction[]
-  loans: Loan[]
-  properties: Property[]
-  ownedPropertyIds: string[]
-  activePropertyId: string | null
-  grids: Record<string, GridCell[]>
-  rooms: Room[]
-  availableShows: Show[]
-  currentShow: Show | null
-  pastShows: Show[]
-  auditionPool: CastMember[]
-  cast: CastMember[]
-  crew: CrewMember[]
-  rehearsalReadiness: number
-  buzzScore: number
-  runDay: number
-  runStats: RunStats | null
-  activeEvents: GameEvent[]
-  eventHistory: string[]
-  reputation: number
-  milestones: string[]
+  // Meta
+  initialized: boolean;
+  theaterName: string;
+
+  // Systems
+  time: TimeState;
+  economy: EconomyState;
+  reputation: ReputationState;
+  ui: UIState;
+
+  // Entities
+  properties: Property[];
+  activePropertyId: string | null;
+  shows: Show[];
+  activeShowId: string | null;
+  showOptions: Show[];
+  castMembers: CastMember[];
+  crew: CrewMember[];
+  events: GameEvent[];
+  performanceHistory: PerformanceResult[];
+
+  // Grid
+  grid: GridState;
+
+  // Camera
+  camera: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
+
+  // Performance / Run
+  ticketPrice: number;
+  activeMarketingCampaigns: MarketingCampaignState[];
+  runDay: number;
+  rehearsalLog: RehearsalLogEntry[];
+  lowAttendanceStreak: number;  // consecutive performance days below 30%
+  runSummary: RunSummary | null;
 }
