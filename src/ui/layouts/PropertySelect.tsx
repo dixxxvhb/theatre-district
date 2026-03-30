@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { AVAILABLE_PROPERTIES } from '../../game/data/properties';
+import { ROOM_DEFINITIONS, REQUIRED_ROOMS } from '../../game/data/rooms';
 import type { Property } from '../../types';
 
 /** Small SVG grid preview showing lot dimensions proportionally */
@@ -252,6 +253,28 @@ export function PropertySelect() {
                 </span>
               </div>
             </div>
+
+            {(() => {
+              const remaining = cash - selectedProperty.cost;
+              const modifier = selectedProperty.constructionCostModifier;
+              const requiredRoomsCost = REQUIRED_ROOMS.reduce((sum, rt) => {
+                const def = ROOM_DEFINITIONS[rt];
+                return sum + Math.round(def.baseCost * modifier);
+              }, 0);
+              const isLow = remaining < requiredRoomsCost;
+              const isBroke = remaining <= 0;
+              if (isBroke) return (
+                <p className="text-red-400 text-xs mb-3 p-2 bg-red-900/20 border border-red-800/30 rounded-lg">
+                  Warning: You'll have no money left to build rooms. You'll need to place tiny rooms and advance days to earn income before expanding.
+                </p>
+              );
+              if (isLow) return (
+                <p className="text-yellow-400 text-xs mb-3 p-2 bg-yellow-900/20 border border-yellow-800/30 rounded-lg">
+                  Tight budget — you'll have ${remaining.toLocaleString()} left. Required rooms cost ~${requiredRoomsCost.toLocaleString()} at standard sizes. Build smaller rooms to save money.
+                </p>
+              );
+              return null;
+            })()}
 
             <div className="flex gap-3">
               <button

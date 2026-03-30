@@ -151,8 +151,8 @@ export function BuildPanel() {
                 <span className="text-gray-600">
                   {room.buildDays}d
                 </span>
-                <span className="text-gray-600" title="Minimum size">
-                  {room.minSize.width}x{room.minSize.height}+
+                <span className="text-gray-600" title={`Min ${room.minSize.width}x${room.minSize.height}, default ${room.defaultSize.width}x${room.defaultSize.height}`}>
+                  {room.minSize.width}x{room.minSize.height}–{room.defaultSize.width}x{room.defaultSize.height}
                 </span>
               </div>
             </button>

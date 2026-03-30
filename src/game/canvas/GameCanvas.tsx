@@ -80,11 +80,11 @@ export function GameCanvas() {
       if (cameraRef.current.wasDragging) return;
       const state = useGameStore.getState();
 
-      // Simple click places at minimum size
+      // Simple click places at default size
       if (state.ui.selectedRoomType) {
         const roomDef = ROOM_DEFINITIONS[state.ui.selectedRoomType];
         if (roomDef) {
-          state.placeRoom(state.ui.selectedRoomType, { x, y }, roomDef.minSize);
+          state.placeRoom(state.ui.selectedRoomType, { x, y }, roomDef.defaultSize);
         }
         return;
       }
@@ -130,13 +130,13 @@ export function GameCanvas() {
       ghost.stroke();
 
     } else {
-      // Not dragging yet — show minimum-size ghost at hover position
+      // Not dragging yet — show default-size ghost at hover position
       const { x, y } = hoveredCellRef.current;
-      const { width: rw, height: rh } = roomDef.minSize;
+      const { width: rw, height: rh } = roomDef.defaultSize;
 
       const activeProperty = state.properties.find((p) => p.id === state.activePropertyId);
       const rooms = activeProperty?.rooms ?? [];
-      const valid = canPlaceRoom(state.grid, { x, y }, roomDef.minSize, rooms);
+      const valid = canPlaceRoom(state.grid, { x, y }, roomDef.defaultSize, rooms);
 
       const color = valid ? 0x22c55e : 0xef4444;
       ghost.rect(x * s, y * s, rw * s, rh * s);

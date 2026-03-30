@@ -40,7 +40,8 @@ export interface RoomDefinition {
   type: RoomType;
   name: string;
   description: string;
-  minSize: Size;
+  minSize: Size;        // absolute minimum (smallest the player can drag)
+  defaultSize: Size;    // default size when click-to-place (no drag)
   baseCost: number;
   buildDays: number;
   required: boolean;

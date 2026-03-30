@@ -278,10 +278,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Validate placement
     if (!canPlaceRoom(state.grid, position, size, activeProperty.rooms)) return false;
 
-    // Calculate cost — scales with area relative to minimum size
-    const minArea = roomDef.minSize.width * roomDef.minSize.height;
+    // Calculate cost — scales with area relative to default size
+    const defaultArea = roomDef.defaultSize.width * roomDef.defaultSize.height;
     const actualArea = size.width * size.height;
-    const areaScale = actualArea / minArea;
+    const areaScale = actualArea / defaultArea;
     const adjustedCost = Math.round(roomDef.baseCost * areaScale * activeProperty.constructionCostModifier);
     if (state.economy.cash < adjustedCost) return false;
 
