@@ -102,7 +102,7 @@ export function RunDashboard() {
 
   return (
     <>
-      <div className="w-80 bg-gray-950/95 border-l border-amber-900/30 flex flex-col overflow-y-auto run-dashboard-enter">
+      <div className="w-80 min-w-[320px] h-full bg-gray-950/95 border-l border-amber-900/30 flex flex-col overflow-y-auto run-dashboard-enter">
         {/* Section 1: Show Info */}
         <div className="p-4 border-b border-amber-800/20">
           <h2

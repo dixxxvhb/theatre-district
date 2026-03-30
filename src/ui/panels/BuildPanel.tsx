@@ -49,7 +49,7 @@ export function BuildPanel() {
   };
 
   return (
-    <div className="w-72 h-full bg-gray-950/95 backdrop-blur-sm border-l border-amber-900/30 flex flex-col overflow-hidden">
+    <div className="w-72 min-w-[288px] h-full bg-gray-950/95 backdrop-blur-sm border-l border-amber-900/30 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b border-amber-900/20">
         <h2
@@ -62,7 +62,7 @@ export function BuildPanel() {
           Build Mode
         </h2>
         <p className="text-gray-500 text-xs mt-1">
-          Click a room type, then click the grid to place it
+          Click to place, or drag to resize
         </p>
       </div>
 
@@ -151,8 +151,8 @@ export function BuildPanel() {
                 <span className="text-gray-600">
                   {room.buildDays}d
                 </span>
-                <span className="text-gray-600">
-                  {room.minSize.width}x{room.minSize.height}
+                <span className="text-gray-600" title="Minimum size">
+                  {room.minSize.width}x{room.minSize.height}+
                 </span>
               </div>
             </button>
@@ -160,8 +160,8 @@ export function BuildPanel() {
         })}
       </div>
 
-      {/* Cancel / Done */}
-      <div className="p-3 border-t border-amber-900/20 space-y-2">
+      {/* Cancel / Done — always visible at bottom */}
+      <div className="flex-shrink-0 p-3 border-t border-amber-900/20 space-y-2">
         {selectedRoomType && (
           <>
             <button
@@ -191,7 +191,7 @@ export function BuildPanel() {
           }`}
         >
           {mvtComplete
-            ? 'Done Building'
+            ? 'Done Building →'
             : mvtPlaced
               ? 'Finish Construction First'
               : 'Build Required Rooms'}

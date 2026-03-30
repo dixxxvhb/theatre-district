@@ -23,6 +23,10 @@ export function GameCanvas() {
   const gameLoopRef = useRef<GameLoop>(new GameLoop());
   const hoveredCellRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Drag-to-size room placement state
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRoomRef = useRef(false);
+
   // Read store values
   const viewMode = useGameStore((s) => s.ui.viewMode);
   const grid = useGameStore((s) => s.grid);
@@ -35,15 +39,48 @@ export function GameCanvas() {
   const selectTile = useGameStore((s) => s.selectTile);
   const setViewMode = useGameStore((s) => s.setViewMode);
 
-  // Cell click handler
+  // Compute the placement rectangle from drag start + current hover, clamped to min size
+  const getPlacementRect = useCallback(() => {
+    const start = dragStartRef.current;
+    const hover = hoveredCellRef.current;
+    const state = useGameStore.getState();
+    if (!start || !hover || !state.ui.selectedRoomType) return null;
+
+    const roomDef = ROOM_DEFINITIONS[state.ui.selectedRoomType];
+    if (!roomDef) return null;
+
+    // Rectangle from drag start to current hover
+    const rawX = Math.min(start.x, hover.x);
+    const rawY = Math.min(start.y, hover.y);
+    const rawW = Math.abs(hover.x - start.x) + 1;
+    const rawH = Math.abs(hover.y - start.y) + 1;
+
+    // Enforce minimum size
+    const w = Math.max(rawW, roomDef.minSize.width);
+    const h = Math.max(rawH, roomDef.minSize.height);
+
+    // Anchor expansion from the drag start corner
+    let x = rawX;
+    let y = rawY;
+
+    // If the user dragged smaller than min, expand from the start point
+    if (rawW < roomDef.minSize.width) {
+      x = hover.x < start.x ? start.x - w + 1 : start.x;
+    }
+    if (rawH < roomDef.minSize.height) {
+      y = hover.y < start.y ? start.y - h + 1 : start.y;
+    }
+
+    return { x, y, width: w, height: h, minWidth: roomDef.minSize.width, minHeight: roomDef.minSize.height };
+  }, []);
+
+  // Cell click handler (for non-placement clicks and simple click-to-place)
   const handleCellClick = useCallback(
     (x: number, y: number) => {
-      // Don't select if we were dragging
       if (cameraRef.current.wasDragging) return;
-
       const state = useGameStore.getState();
 
-      // If in placement mode, try to place the room
+      // Simple click places at minimum size
       if (state.ui.selectedRoomType) {
         const roomDef = ROOM_DEFINITIONS[state.ui.selectedRoomType];
         if (roomDef) {
@@ -52,7 +89,6 @@ export function GameCanvas() {
         return;
       }
 
-      // Check if clicking on an existing room (for potential demolish)
       selectTile({ x, y });
     },
     [selectTile],
@@ -75,24 +111,58 @@ export function GameCanvas() {
     const roomDef = ROOM_DEFINITIONS[state.ui.selectedRoomType];
     if (!roomDef) return;
 
-    const { x, y } = hoveredCellRef.current;
-    const { width: rw, height: rh } = roomDef.minSize;
     const s = TILE.FLOOR_SIZE;
 
-    // Check validity
-    const activeProperty = state.properties.find((p) => p.id === state.activePropertyId);
-    const rooms = activeProperty?.rooms ?? [];
-    const valid = canPlaceRoom(state.grid, { x, y }, roomDef.minSize, rooms);
+    if (isDraggingRoomRef.current && dragStartRef.current) {
+      // Show the drag rectangle
+      const rect = getPlacementRect();
+      if (!rect) return;
 
-    const color = valid ? 0x22c55e : 0xef4444; // green or red
-    const alpha = 0.35;
+      const activeProperty = state.properties.find((p) => p.id === state.activePropertyId);
+      const rooms = activeProperty?.rooms ?? [];
+      const valid = canPlaceRoom(state.grid, { x: rect.x, y: rect.y }, { width: rect.width, height: rect.height }, rooms);
 
-    ghost.rect(x * s, y * s, rw * s, rh * s);
-    ghost.fill({ color, alpha });
-    ghost.setStrokeStyle({ width: 2, color, alpha: 0.8 });
-    ghost.rect(x * s, y * s, rw * s, rh * s);
-    ghost.stroke();
-  }, []);
+      const color = valid ? 0x22c55e : 0xef4444;
+      ghost.rect(rect.x * s, rect.y * s, rect.width * s, rect.height * s);
+      ghost.fill({ color, alpha: 0.35 });
+      ghost.setStrokeStyle({ width: 2, color, alpha: 0.8 });
+      ghost.rect(rect.x * s, rect.y * s, rect.width * s, rect.height * s);
+      ghost.stroke();
+
+    } else {
+      // Not dragging yet — show minimum-size ghost at hover position
+      const { x, y } = hoveredCellRef.current;
+      const { width: rw, height: rh } = roomDef.minSize;
+
+      const activeProperty = state.properties.find((p) => p.id === state.activePropertyId);
+      const rooms = activeProperty?.rooms ?? [];
+      const valid = canPlaceRoom(state.grid, { x, y }, roomDef.minSize, rooms);
+
+      const color = valid ? 0x22c55e : 0xef4444;
+      ghost.rect(x * s, y * s, rw * s, rh * s);
+      ghost.fill({ color, alpha: 0.25 });
+      ghost.setStrokeStyle({ width: 2, color, alpha: 0.6 });
+      ghost.rect(x * s, y * s, rw * s, rh * s);
+      ghost.stroke();
+
+      // Show "click & drag to resize" hint with dashed lines extending from min size
+      if (rw < state.grid.width - x || rh < state.grid.height - y) {
+        const hintColor = 0x888888;
+        ghost.setStrokeStyle({ width: 1, color: hintColor, alpha: 0.3 });
+        // Right expansion hint
+        ghost.moveTo((x + rw) * s, y * s + 4);
+        ghost.lineTo((x + rw) * s + s * 0.5, y * s + 4);
+        ghost.moveTo((x + rw) * s, y * s + rh * s - 4);
+        ghost.lineTo((x + rw) * s + s * 0.5, y * s + rh * s - 4);
+        // Bottom expansion hint
+        ghost.moveTo(x * s + 4, (y + rh) * s);
+        ghost.lineTo(x * s + 4, (y + rh) * s + s * 0.5);
+        ghost.moveTo(x * s + rw * s - 4, (y + rh) * s);
+        ghost.lineTo(x * s + rw * s - 4, (y + rh) * s + s * 0.5);
+        ghost.stroke();
+      }
+    }
+  }, [getPlacementRect]);
 
   // Escape / right-click to cancel placement
   useEffect(() => {
@@ -102,6 +172,8 @@ export function GameCanvas() {
         const state = useGameStore.getState();
         if (state.ui.selectedRoomType) {
           state.selectRoomType(null);
+          dragStartRef.current = null;
+          isDraggingRoomRef.current = false;
         }
       }
       if (e.key.toLowerCase() === 'v') {
@@ -114,6 +186,8 @@ export function GameCanvas() {
       if (state.ui.selectedRoomType) {
         e.preventDefault();
         state.selectRoomType(null);
+        dragStartRef.current = null;
+        isDraggingRoomRef.current = false;
       }
     };
 
@@ -180,7 +254,7 @@ export function GameCanvas() {
         setCamera(x, y, zoom);
       });
 
-      // Set world bounds from grid (may be 0 at init, recalculated on grid change)
+      // Set world bounds from grid
       const state = useGameStore.getState();
       if (state.grid.width > 0) {
         const worldW = state.grid.width * TILE.FLOOR_SIZE;
@@ -189,51 +263,115 @@ export function GameCanvas() {
         cameraRef.current.centerOnGrid(state.grid.width, state.grid.height, false);
       }
 
-      // Isometric mouse picking
-      canvas.addEventListener('pointermove', (e: PointerEvent) => {
+      // Helper: convert screen coords to grid cell
+      const screenToCell = (e: PointerEvent) => {
         const store = useGameStore.getState();
-        if (store.ui.viewMode !== 'isometric') return;
-
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
+        const cam = store.camera;
+        const worldX = (mouseX - cam.x) / cam.zoom;
+        const worldY = (mouseY - cam.y) / cam.zoom;
+        const cellX = Math.floor(worldX / TILE.FLOOR_SIZE);
+        const cellY = Math.floor(worldY / TILE.FLOOR_SIZE);
+        if (cellX >= 0 && cellX < store.grid.width && cellY >= 0 && cellY < store.grid.height) {
+          return { x: cellX, y: cellY };
+        }
+        return null;
+      };
 
+      // --- Pointer events for drag-to-size room placement ---
+
+      canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        const store = useGameStore.getState();
+        if (store.ui.viewMode !== 'floorplan') return;
+        if (!store.ui.selectedRoomType) return;
+
+        const cell = screenToCell(e);
+        if (cell) {
+          dragStartRef.current = cell;
+          isDraggingRoomRef.current = true;
+          // Prevent camera from starting a drag when placing rooms
+          cameraRef.current.cancelDrag();
+        }
+      });
+
+      canvas.addEventListener('pointermove', (e: PointerEvent) => {
+        const store = useGameStore.getState();
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
         const cam = store.camera;
         const worldX = (mouseX - cam.x) / cam.zoom;
         const worldY = (mouseY - cam.y) / cam.zoom;
 
-        const cell = screenToGrid(worldX, worldY, TILE.ISO_WIDTH, TILE.ISO_HEIGHT);
-
-        if (cell.x >= 0 && cell.x < store.grid.width && cell.y >= 0 && cell.y < store.grid.height) {
-          isometricRef.current.drawHover(cell);
+        if (store.ui.viewMode === 'floorplan') {
+          const cellX = Math.floor(worldX / TILE.FLOOR_SIZE);
+          const cellY = Math.floor(worldY / TILE.FLOOR_SIZE);
+          if (cellX >= 0 && cellX < store.grid.width && cellY >= 0 && cellY < store.grid.height) {
+            handleCellHover(cellX, cellY);
+          }
         } else {
-          isometricRef.current.drawHover(null);
+          const cell = screenToGrid(worldX, worldY, TILE.ISO_WIDTH, TILE.ISO_HEIGHT);
+          if (cell.x >= 0 && cell.x < store.grid.width && cell.y >= 0 && cell.y < store.grid.height) {
+            isometricRef.current.drawHover(cell);
+          } else {
+            isometricRef.current.drawHover(null);
+          }
         }
       });
 
       canvas.addEventListener('pointerup', (e: PointerEvent) => {
         if (e.button !== 0) return;
-        if (cameraRef.current.wasDragging) return;
 
         const store = useGameStore.getState();
-        if (store.ui.viewMode !== 'isometric') return;
 
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        // Handle drag-to-size room placement
+        if (isDraggingRoomRef.current && dragStartRef.current && store.ui.selectedRoomType) {
+          isDraggingRoomRef.current = false;
 
+          const cell = screenToCell(e);
+          if (cell) {
+            hoveredCellRef.current = cell;
+          }
+
+          const rect = getPlacementRect();
+          if (rect) {
+            store.placeRoom(
+              store.ui.selectedRoomType,
+              { x: rect.x, y: rect.y },
+              { width: rect.width, height: rect.height },
+            );
+          }
+          dragStartRef.current = null;
+          return;
+        }
+
+        if (cameraRef.current.wasDragging) return;
+
+        const canvasRect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - canvasRect.left;
+        const mouseY = e.clientY - canvasRect.top;
         const cam = store.camera;
         const worldX = (mouseX - cam.x) / cam.zoom;
         const worldY = (mouseY - cam.y) / cam.zoom;
 
-        const cell = screenToGrid(worldX, worldY, TILE.ISO_WIDTH, TILE.ISO_HEIGHT);
-
-        if (cell.x >= 0 && cell.x < store.grid.width && cell.y >= 0 && cell.y < store.grid.height) {
-          selectTile(cell);
+        if (store.ui.viewMode === 'floorplan') {
+          const cellX = Math.floor(worldX / TILE.FLOOR_SIZE);
+          const cellY = Math.floor(worldY / TILE.FLOOR_SIZE);
+          if (cellX >= 0 && cellX < store.grid.width && cellY >= 0 && cellY < store.grid.height) {
+            handleCellClick(cellX, cellY);
+          }
+        } else {
+          const cell = screenToGrid(worldX, worldY, TILE.ISO_WIDTH, TILE.ISO_HEIGHT);
+          if (cell.x >= 0 && cell.x < store.grid.width && cell.y >= 0 && cell.y < store.grid.height) {
+            selectTile(cell);
+          }
         }
       });
 
-      // Game loop tick for WASD + game time + ghost preview + renderer animations
+      // Game loop tick
       const gameLoop = gameLoopRef.current;
       app.ticker.add((ticker) => {
         cameraRef.current.tick();
@@ -270,7 +408,7 @@ export function GameCanvas() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recenter camera when grid size changes (e.g. after property purchase)
+  // Recenter camera when grid size changes
   useEffect(() => {
     if (grid.width === 0 || grid.height === 0) return;
     const worldW = grid.width * TILE.FLOOR_SIZE;
@@ -279,7 +417,7 @@ export function GameCanvas() {
     cameraRef.current.centerOnGrid(grid.width, grid.height, viewMode === 'isometric');
   }, [grid.width, grid.height, viewMode]);
 
-  // Update renderers when grid/camera/viewMode/selection changes
+  // Update renderers
   useEffect(() => {
     if (!worldContainerRef.current) return;
 
@@ -312,6 +450,8 @@ export function GameCanvas() {
   useEffect(() => {
     if (!selectedRoomType && ghostRef.current) {
       ghostRef.current.clear();
+      dragStartRef.current = null;
+      isDraggingRoomRef.current = false;
     }
   }, [selectedRoomType]);
 

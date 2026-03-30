@@ -49,7 +49,7 @@ export function MarketingPanel() {
                                      'from-red-600 to-orange-500';
 
   return (
-    <div className="w-72 bg-gray-950/95 border-l border-amber-900/30 flex flex-col overflow-y-auto">
+    <div className="w-72 min-w-[288px] h-full bg-gray-950/95 border-l border-amber-900/30 flex flex-col overflow-y-auto">
       <div className="p-4 border-b border-gray-800/40">
         <h2
           className="text-amber-200 text-sm font-bold tracking-wide"

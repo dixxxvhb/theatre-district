@@ -144,7 +144,7 @@ export function StaffPanel() {
   const weeklyCost = hiredCrew.reduce((sum, c) => sum + c.salary, 0);
 
   return (
-    <div className="w-80 h-full bg-gray-950/95 backdrop-blur-sm border-l border-amber-900/30 flex flex-col overflow-hidden">
+    <div className="w-80 min-w-[320px] h-full bg-gray-950/95 backdrop-blur-sm border-l border-amber-900/30 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-amber-900/20">
         <h2
@@ -267,7 +267,7 @@ export function StaffPanel() {
       </div>
 
       {/* Proceed */}
-      <div className="p-3 border-t border-amber-900/20 space-y-2">
+      <div className="flex-shrink-0 p-3 border-t border-amber-900/20 space-y-2">
         <button
           onClick={handleProceedToAuditions}
           disabled={!canProceed}

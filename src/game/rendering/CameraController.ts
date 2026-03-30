@@ -43,6 +43,12 @@ export class CameraController {
     return this.dragMoved;
   }
 
+  /** Cancel any in-progress drag (used when room placement steals the pointer) */
+  cancelDrag(): void {
+    this.isDragging = false;
+    this.dragMoved = false;
+  }
+
   init(
     canvas: HTMLCanvasElement,
     screenWidth: number,
