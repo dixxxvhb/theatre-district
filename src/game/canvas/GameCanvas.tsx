@@ -233,12 +233,13 @@ export function GameCanvas() {
         }
       });
 
-      // Game loop tick for WASD + game time + ghost preview
+      // Game loop tick for WASD + game time + ghost preview + renderer animations
       const gameLoop = gameLoopRef.current;
       app.ticker.add((ticker) => {
         cameraRef.current.tick();
         gameLoop.update(ticker);
         drawGhostPreview();
+        floorPlanRef.current.tick(ticker.deltaMS);
       });
 
       // Handle resize

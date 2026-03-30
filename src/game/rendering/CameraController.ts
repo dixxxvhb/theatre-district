@@ -57,7 +57,7 @@ export class CameraController {
     canvas.addEventListener('pointerdown', this.handlePointerDown);
     window.addEventListener('pointermove', this.handlePointerMove);
     window.addEventListener('pointerup', this.handlePointerUp);
-    canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+    canvas.addEventListener('wheel', this.handleWheel, { passive: false, capture: false });
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
   }
@@ -160,24 +160,33 @@ export class CameraController {
     e.preventDefault();
 
     const oldZoom = this.state.zoom;
-    const direction = e.deltaY < 0 ? 1 : -1;
-    const newZoom = Math.max(
-      CAMERA.MIN_ZOOM,
-      Math.min(CAMERA.MAX_ZOOM, oldZoom + direction * CAMERA.ZOOM_SPEED),
-    );
 
-    if (newZoom === oldZoom) return;
+    // Trackpads send deltaMode=0 with small fractional deltas.
+    // Mouse wheels send deltaMode=0 with large deltas (~100) or deltaMode=1 (line mode).
+    // Normalize so both feel similar.
+    let delta: number;
+    if (e.deltaMode === 1) {
+      // Line mode (some mice) — each tick is one line
+      delta = -e.deltaY * CAMERA.ZOOM_SPEED;
+    } else {
+      // Pixel mode — could be trackpad (small) or mouse wheel (large ~100)
+      const isTrackpad = Math.abs(e.deltaY) < 50;
+      delta = isTrackpad
+        ? -e.deltaY * CAMERA.ZOOM_SPEED_TRACKPAD
+        : -(e.deltaY > 0 ? 1 : -1) * CAMERA.ZOOM_SPEED;
+    }
+
+    const newZoom = Math.max(CAMERA.MIN_ZOOM, Math.min(CAMERA.MAX_ZOOM, oldZoom + delta));
+    if (Math.abs(newZoom - oldZoom) < 0.0001) return;
 
     // Zoom toward cursor position
     const rect = this.canvas!.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // World point under cursor before zoom
     const worldX = (mouseX - this.state.x) / oldZoom;
     const worldY = (mouseY - this.state.y) / oldZoom;
 
-    // Adjust camera so world point stays under cursor
     this.state.x = mouseX - worldX * newZoom;
     this.state.y = mouseY - worldY * newZoom;
     this.state.zoom = newZoom;

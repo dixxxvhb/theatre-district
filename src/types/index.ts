@@ -145,6 +145,7 @@ export interface CastMember {
   morale: number;         // 0-100
   chemistry: number;      // 0-100, with current cast
   roleId: string;
+  personality: string;    // brief descriptor
 }
 
 export interface ShowRole {
@@ -190,6 +191,7 @@ export interface CrewMember {
   salary: number;         // weekly
   morale: number;         // 0-100
   hired: boolean;
+  personality: string;    // brief descriptor
 }
 
 export interface GameEvent {
@@ -370,4 +372,5 @@ export interface GameState {
   rehearsalLog: RehearsalLogEntry[];
   lowAttendanceStreak: number;  // consecutive performance days below 30%
   runSummary: RunSummary | null;
+  showOpeningNightModal: boolean;
 }

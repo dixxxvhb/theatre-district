@@ -36,7 +36,7 @@ export function MainMenu() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-950 relative overflow-hidden">
+    <div className="w-full min-h-screen h-full flex flex-col items-center justify-center bg-gray-950 relative overflow-hidden">
       {/* Curtain effect */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Left curtain */}

@@ -22,9 +22,10 @@ export const ROOM_COLORS: Record<string, number> = {
 };
 
 export const CAMERA = {
-  MIN_ZOOM: 0.5,
-  MAX_ZOOM: 2.0,
-  ZOOM_SPEED: 0.1,
+  MIN_ZOOM: 0.4,
+  MAX_ZOOM: 2.5,
+  ZOOM_SPEED: 0.06,         // per scroll event — lower = smoother on trackpad
+  ZOOM_SPEED_TRACKPAD: 0.004, // trackpad sends deltaMode=0 with tiny deltas
   PAN_SPEED: 8,             // pixels per frame for WASD
   DRAG_BUTTON: 0,           // left mouse
 } as const;

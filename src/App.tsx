@@ -10,7 +10,9 @@ import { ShowPickerModal } from './ui/modals/ShowPickerModal';
 import { AuditionModal } from './ui/modals/AuditionModal';
 import { EventModal } from './ui/modals/EventModal';
 import { EndOfRunModal } from './ui/modals/EndOfRunModal';
+import { OpeningNightModal } from './ui/modals/OpeningNightModal';
 import { SaveLoadModal } from './ui/modals/SaveLoadModal';
+import { RunDashboard } from './ui/panels/RunDashboard';
 import { MoneyDisplay } from './ui/components/MoneyDisplay';
 import { NotificationToast } from './ui/components/NotificationToast';
 import { getFormattedDate } from './game/engine/TimeManager';
@@ -70,6 +72,111 @@ function PhaseBreadcrumb() {
   );
 }
 
+/** Tiny keyboard shortcut badge */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-block bg-gray-800 border border-gray-600 rounded px-1 py-px text-[10px] font-mono text-gray-400 leading-tight ml-1">
+      {children}
+    </span>
+  );
+}
+
+const SPEED_KEYS: Record<string, string> = {
+  paused: 'Space',
+  normal: '1',
+  fast: '2',
+  ultra: '3',
+};
+
+/** Secondary status row shown during rehearsal/running phases */
+function StatusBar() {
+  const currentPhase = useGameStore((s) => s.ui.currentPhase);
+  const shows = useGameStore((s) => s.shows);
+  const activeShowId = useGameStore((s) => s.activeShowId);
+  const performanceHistory = useGameStore((s) => s.performanceHistory);
+  const runDay = useGameStore((s) => s.runDay);
+
+  const activeShow = shows.find((s) => s.id === activeShowId);
+
+  if (currentPhase !== 'rehearsal' && currentPhase !== 'running') return null;
+  if (!activeShow) return null;
+
+  // Buzz bar color
+  const buzz = Math.round(activeShow.buzzScore);
+  const buzzColor =
+    buzz > 60 ? 'from-amber-500 to-yellow-300' :
+    buzz > 30 ? 'from-orange-500 to-amber-400' :
+               'from-red-600 to-orange-500';
+
+  // Quality color
+  const quality = activeShow.quality;
+  const qualityColor =
+    quality > 80 ? 'text-amber-300' :
+    quality > 60 ? 'text-emerald-400' :
+    quality > 40 ? 'text-orange-400' :
+                   'text-red-400';
+
+  // Last performance
+  const lastPerf = performanceHistory.length > 0
+    ? performanceHistory[performanceHistory.length - 1]
+    : null;
+
+  return (
+    <div className="h-7 bg-gray-950/80 border-b border-gray-800/30 flex items-center gap-4 px-4 text-xs">
+      {/* Buzz meter */}
+      <div className="flex items-center gap-2">
+        <span className="text-gray-500 uppercase tracking-wider text-[10px]">Buzz</span>
+        <div className="w-20 h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full bg-gradient-to-r ${buzzColor} rounded-full transition-all`}
+            style={{ width: `${buzz}%` }}
+          />
+        </div>
+        <span className="text-amber-300 font-mono text-[11px] w-5 text-right">{buzz}</span>
+      </div>
+
+      {/* Show quality (during running) */}
+      {currentPhase === 'running' && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-500 uppercase tracking-wider text-[10px]">Quality</span>
+          <span className={`font-mono text-[11px] font-bold ${qualityColor}`}>{quality}</span>
+        </div>
+      )}
+
+      {/* Run counter or rehearsal progress */}
+      {currentPhase === 'running' ? (
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-500 text-[10px]">Day</span>
+          <span className="text-gray-300 font-mono text-[11px]">{runDay}</span>
+          <span className="text-gray-600 text-[10px]">of run</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-500 uppercase tracking-wider text-[10px]">Rehearsal</span>
+          <span className="text-amber-300 font-mono text-[11px]">{Math.round(activeShow.rehearsalProgress)}%</span>
+        </div>
+      )}
+
+      {/* Last night attendance (running) */}
+      {currentPhase === 'running' && lastPerf && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-500 text-[10px]">Last night</span>
+          <span className="text-gray-300 font-mono text-[11px]">
+            {lastPerf.attendance}/{lastPerf.capacity}
+          </span>
+          <span className={`font-mono text-[10px] ${
+            lastPerf.capacity > 0 && (lastPerf.attendance / lastPerf.capacity) > 0.7
+              ? 'text-emerald-400'
+              : 'text-orange-400'
+          }`}>
+            ({lastPerf.capacity > 0 ? Math.round((lastPerf.attendance / lastPerf.capacity) * 100) : 0}%)
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const theaterName = useGameStore((s) => s.theaterName);
   const day = useGameStore((s) => s.time.day);
@@ -85,70 +192,76 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const phaseLabel = PHASE_LABELS[currentPhase] ?? currentPhase;
 
   return (
-    <div className="h-12 bg-gray-950/90 border-b border-amber-900/30 flex items-center justify-between px-4 backdrop-blur-sm z-10 relative">
-      <div className="flex items-center gap-4">
-        <h1
-          className="text-amber-200 text-lg tracking-wide"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-        >
-          {theaterName || 'Broadway Tycoon'}
-        </h1>
-        <span className="text-gray-400 text-xs font-mono">{dateStr}</span>
-        <span className="text-gray-600 text-xs px-2 py-0.5 rounded bg-gray-900/60 border border-gray-800/40">
-          {phaseLabel}
-        </span>
+    <>
+      <div className="h-12 bg-gray-950/90 border-b border-amber-900/30 flex items-center justify-between px-4 backdrop-blur-sm z-10 relative">
+        <div className="flex items-center gap-4">
+          <h1
+            className="text-amber-200 text-lg tracking-wide"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
+            {theaterName || 'Broadway Tycoon'}
+          </h1>
+          <span className="text-gray-400 text-xs font-mono">{dateStr}</span>
+          <span className="text-gray-600 text-xs px-2 py-0.5 rounded bg-gray-900/60 border border-gray-800/40">
+            {phaseLabel}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {SPEED_OPTIONS.map((opt) => {
+            const isActive =
+              opt.value === 'paused'
+                ? isPaused
+                : speed === opt.value && !isPaused;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  if (opt.value === 'paused') {
+                    togglePause();
+                  } else {
+                    setSpeed(opt.value);
+                  }
+                }}
+                className={`px-2.5 py-1 text-xs rounded transition-all cursor-pointer border ${
+                  isActive
+                    ? 'bg-amber-900/40 border-amber-700/50 text-amber-200'
+                    : 'bg-gray-900/40 border-gray-800/40 text-gray-500 hover:text-gray-300 hover:border-gray-700/50'
+                }`}
+              >
+                {opt.label}
+                <Kbd>{SPEED_KEYS[opt.value]}</Kbd>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-4">
+          <MoneyDisplay />
+
+          <button
+            onClick={() =>
+              setViewMode(viewMode === 'floorplan' ? 'isometric' : 'floorplan')
+            }
+            className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors cursor-pointer"
+            title="Toggle view mode (V)"
+          >
+            {viewMode === 'floorplan' ? 'Floor Plan' : 'Isometric'}
+            <Kbd>V</Kbd>
+          </button>
+
+          <button
+            onClick={onMenuClick}
+            className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors cursor-pointer"
+            title="Save/Load (Esc)"
+          >
+            Menu
+            <Kbd>Esc</Kbd>
+          </button>
+        </div>
       </div>
-
-      <div className="flex items-center gap-1">
-        {SPEED_OPTIONS.map((opt) => {
-          const isActive =
-            opt.value === 'paused'
-              ? isPaused
-              : speed === opt.value && !isPaused;
-          return (
-            <button
-              key={opt.value}
-              onClick={() => {
-                if (opt.value === 'paused') {
-                  togglePause();
-                } else {
-                  setSpeed(opt.value);
-                }
-              }}
-              className={`px-2.5 py-1 text-xs rounded transition-all cursor-pointer border ${
-                isActive
-                  ? 'bg-amber-900/40 border-amber-700/50 text-amber-200'
-                  : 'bg-gray-900/40 border-gray-800/40 text-gray-500 hover:text-gray-300 hover:border-gray-700/50'
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-4">
-        <MoneyDisplay />
-
-        <button
-          onClick={() =>
-            setViewMode(viewMode === 'floorplan' ? 'isometric' : 'floorplan')
-          }
-          className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors cursor-pointer"
-          title="Toggle view mode (V)"
-        >
-          {viewMode === 'floorplan' ? 'Floor Plan' : 'Isometric'}
-        </button>
-
-        <button
-          onClick={onMenuClick}
-          className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors cursor-pointer"
-          title="Save/Load (Esc)"
-        >
-          Menu
-        </button>
-      </div>
-    </div>
+      <StatusBar />
+    </>
   );
 }
 
@@ -292,205 +405,8 @@ function RehearsalOverlay() {
   );
 }
 
-function RunningDashboard() {
-  const shows = useGameStore((s) => s.shows);
-  const activeShowId = useGameStore((s) => s.activeShowId);
-  const performanceHistory = useGameStore((s) => s.performanceHistory);
-  const ticketPrice = useGameStore((s) => s.ticketPrice);
-  const setTicketPrice = useGameStore((s) => s.setTicketPrice);
-  const runDay = useGameStore((s) => s.runDay);
-  const events = useGameStore((s) => s.events);
-  const closeShow = useGameStore((s) => s.closeShow);
-  const activeShow = shows.find((s) => s.id === activeShowId);
-  if (!activeShow?.isRunning) return null;
-
-  // Last 7 performances (skip dark days)
-  const recentPerfs = performanceHistory.slice(-7);
-  const maxRevInRecent = recentPerfs.length > 0
-    ? Math.max(...recentPerfs.map((p) => p.revenue))
-    : 1;
-
-  // Totals
-  const totalRevenue = performanceHistory.reduce((s, p) => s + p.revenue, 0);
-  const totalExpenses = performanceHistory.reduce((s, p) => s + p.expenses, 0);
-  const totalProfit = totalRevenue - totalExpenses;
-  const avgAttendance = performanceHistory.length > 0
-    ? performanceHistory.reduce((s, p) => s + (p.capacity > 0 ? p.attendance / p.capacity : 0), 0) / performanceHistory.length * 100
-    : 0;
-
-  // Recent events
-  const recentEvents = events.filter((e) => e.resolved).slice(-5).reverse();
-
-  // Close show handler
-  const handleCloseShow = () => {
-    if (!confirm('Are you sure you want to close this show?')) return;
-
-    const sorted = [...performanceHistory].sort((a, b) => a.profit - b.profit);
-    const bestNight = sorted.length > 0 ? sorted[sorted.length - 1] : null;
-    const worstNight = sorted.length > 0 ? sorted[0] : null;
-
-    const repChange = avgAttendance > 60
-      ? Math.round(10 * (avgAttendance / 100))
-      : -5;
-
-    closeShow(activeShow.id, {
-      showTitle: activeShow.title,
-      totalPerformances: performanceHistory.length,
-      totalRevenue,
-      totalExpenses,
-      profit: totalProfit,
-      averageAttendancePercent: Math.round(avgAttendance),
-      bestNight,
-      worstNight,
-      reputationChange: repChange,
-      runDays: runDay,
-    });
-  };
-
-  const buzzColor = activeShow.buzzScore > 66 ? 'from-amber-500 to-yellow-300' :
-                    activeShow.buzzScore > 33 ? 'from-orange-500 to-amber-400' :
-                                                'from-red-600 to-orange-500';
-
-  return (
-    <div className="w-80 bg-gray-950/95 border-l border-amber-900/30 flex flex-col overflow-y-auto">
-      {/* Show Info */}
-      <div className="p-4 border-b border-gray-800/40">
-        <h2
-          className="text-amber-200 text-sm font-bold tracking-wide"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-        >
-          {activeShow.title}
-        </h2>
-        <p className="text-xs text-gray-500 mt-0.5">Day {runDay} of run</p>
-      </div>
-
-      {/* Stats */}
-      <div className="p-4 border-b border-gray-800/30 grid grid-cols-2 gap-3">
-        <MiniStat label="Quality" value={`${activeShow.quality}`} />
-        <MiniStat label="Performances" value={`${performanceHistory.length}`} />
-        <MiniStat label="Avg Attendance" value={`${Math.round(avgAttendance)}%`} color={avgAttendance > 60 ? 'text-emerald-400' : 'text-red-400'} />
-        <MiniStat label="Total Revenue" value={`$${totalRevenue.toLocaleString()}`} color="text-emerald-400" />
-      </div>
-
-      {/* Buzz */}
-      <div className="p-4 border-b border-gray-800/30">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-gray-400 uppercase tracking-wider">Buzz</span>
-          <span className="text-xs font-mono text-amber-300">{Math.round(activeShow.buzzScore)}</span>
-        </div>
-        <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-          <div className={`h-full bg-gradient-to-r ${buzzColor} rounded-full transition-all`} style={{ width: `${activeShow.buzzScore}%` }} />
-        </div>
-      </div>
-
-      {/* Revenue Chart */}
-      <div className="p-4 border-b border-gray-800/30">
-        <h3 className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">Last 7 Performances</h3>
-        {recentPerfs.length === 0 ? (
-          <p className="text-xs text-gray-600 italic">No performances yet</p>
-        ) : (
-          <div className="flex items-end gap-1 h-16">
-            {recentPerfs.map((p, i) => {
-              const height = maxRevInRecent > 0 ? (p.revenue / maxRevInRecent) * 100 : 0;
-              const isProfit = p.profit >= 0;
-              return (
-                <div
-                  key={i}
-                  className="flex-1 rounded-t"
-                  style={{
-                    height: `${Math.max(4, height)}%`,
-                    background: isProfit
-                      ? 'linear-gradient(to top, #065f46, #10b981)'
-                      : 'linear-gradient(to top, #7f1d1d, #ef4444)',
-                  }}
-                  title={`$${p.revenue.toLocaleString()} rev / ${p.attendance} attended`}
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Ticket Price */}
-      <div className="p-4 border-b border-gray-800/30">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-400 uppercase tracking-wider">Ticket Price</span>
-          <span className="text-sm font-mono text-amber-200">${ticketPrice}</span>
-        </div>
-        <input
-          type="range"
-          min={20}
-          max={150}
-          step={5}
-          value={ticketPrice}
-          onChange={(e) => setTicketPrice(Number(e.target.value))}
-          className="w-full accent-amber-500"
-        />
-        <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
-          <span>$20</span>
-          <span>$150</span>
-        </div>
-      </div>
-
-      {/* Recent Events */}
-      <div className="p-4 border-b border-gray-800/30">
-        <h3 className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">Recent Events</h3>
-        {recentEvents.length === 0 ? (
-          <p className="text-xs text-gray-600 italic">No events yet</p>
-        ) : (
-          <div className="space-y-1.5">
-            {recentEvents.map((e) => {
-              const sevColor = e.severity === 'major' ? 'text-red-400' : e.severity === 'moderate' ? 'text-amber-400' : 'text-emerald-400';
-              return (
-                <div key={e.id} className="text-xs py-1 border-b border-gray-800/20 last:border-0">
-                  <span className={`${sevColor} mr-1`}>{'\u2022'}</span>
-                  <span className="text-gray-300">{e.title}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Close Show */}
-      <div className="p-4 mt-auto">
-        <button
-          onClick={handleCloseShow}
-          className="w-full py-2.5 px-4 bg-red-950/30 border border-red-800/40 rounded-lg text-red-300 text-xs font-medium hover:bg-red-950/50 transition-all cursor-pointer"
-        >
-          Close Show
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div>
-      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-      <p className={`text-sm font-mono font-bold ${color ?? 'text-gray-200'}`}>{value}</p>
-    </div>
-  );
-}
-
-function PhaseTransition({ phase }: { phase: string }) {
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), 400);
-    return () => clearTimeout(timer);
-  }, [phase]);
-
-  if (!visible) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] bg-gray-950 pointer-events-none transition-opacity duration-300"
-      style={{ opacity: visible ? 0.6 : 0 }}
-    />
-  );
+function PhaseTransitionOverlay() {
+  return <div className="phase-transition" />;
 }
 
 function App() {
@@ -634,7 +550,7 @@ function App() {
         </div>
         <EndOfRunModal />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransition phase={currentPhase} />}
+        {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
       </div>
     );
@@ -654,7 +570,7 @@ function App() {
           <BuildPanel />
         </div>
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransition phase={currentPhase} />}
+        {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
       </div>
     );
@@ -672,7 +588,7 @@ function App() {
           </div>
           <ShowPickerModal />
           {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-          {showTransition && <PhaseTransition phase={currentPhase} />}
+          {showTransition && <PhaseTransitionOverlay />}
           <NotificationToast />
         </div>
       );
@@ -690,7 +606,7 @@ function App() {
           <StaffPanel />
         </div>
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransition phase={currentPhase} />}
+        {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
       </div>
     );
@@ -707,7 +623,7 @@ function App() {
         </div>
         <AuditionModal />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransition phase={currentPhase} />}
+        {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
       </div>
     );
@@ -727,8 +643,9 @@ function App() {
           </div>
           <MarketingPanel />
         </div>
+        <OpeningNightModal />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransition phase={currentPhase} />}
+        {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
       </div>
     );
@@ -745,13 +662,11 @@ function App() {
             <GameCanvas />
             <TileInfo />
           </div>
-          <div className="flex flex-col">
-            <RunningDashboard />
-          </div>
+          <RunDashboard />
         </div>
         {hasUnresolvedEvent && <EventModal />}
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransition phase={currentPhase} />}
+        {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
       </div>
     );
@@ -767,7 +682,7 @@ function App() {
         <TileInfo />
       </div>
       {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-      {showTransition && <PhaseTransition phase={currentPhase} />}
+      {showTransition && <PhaseTransitionOverlay />}
       <NotificationToast />
     </div>
   );

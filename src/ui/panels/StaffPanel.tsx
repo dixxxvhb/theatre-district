@@ -35,6 +35,9 @@ function HireCandidateCard({
     <div className="flex items-center gap-3 p-2.5 rounded-lg bg-black/40 border border-gray-800/40">
       <div className="flex-1 min-w-0">
         <div className="text-sm text-gray-200 font-medium truncate">{candidate.name}</div>
+        {candidate.personality && (
+          <div className="text-[10px] italic text-gray-500 leading-tight mt-0.5">{candidate.personality}</div>
+        )}
         <div className="mt-1">
           <SkillBar value={candidate.skill} />
         </div>
@@ -134,7 +137,7 @@ export function StaffPanel() {
   };
 
   const handleProceedToAuditions = () => {
-    setPhase('audition' as any);
+    setPhase('audition');
   };
 
   // Weekly crew cost

@@ -171,8 +171,9 @@ export class GameLoop {
         performanceHistory: [],
       });
 
-      state.setPhase('running');
-      pushToast('Show opening night!', 'success');
+      // Show opening night modal instead of auto-transitioning
+      state.setShowOpeningNightModal(true);
+      state.setSpeed('paused');
     }
   }
 

@@ -69,6 +69,7 @@ const initialState: GameState = {
   rehearsalLog: [],
   lowAttendanceStreak: 0,
   runSummary: null,
+  showOpeningNightModal: false,
 };
 
 interface GameActions {
@@ -140,6 +141,10 @@ interface GameActions {
   addEvent: (event: import('../types').GameEvent) => void;
   resolveEvent: (eventId: string, choiceId: string) => void;
   applyEventEffects: (effects: EventEffect[]) => void;
+
+  // Opening night
+  setShowOpeningNightModal: (show: boolean) => void;
+  dismissOpeningNight: () => void;
 
   // Show closing
   closeShow: (showId: string, summary: RunSummary) => void;
@@ -429,6 +434,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         : show,
     ),
     ui: { ...s.ui, currentPhase: 'rehearsal' as GamePhase },
+    time: { ...s.time, isPaused: false, speed: 'normal' as SpeedSetting },
     rehearsalLog: [],
   })),
 
@@ -606,6 +612,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }));
   },
 
+  // ---- Opening Night ----
+  setShowOpeningNightModal: (show: boolean) => set({ showOpeningNightModal: show }),
+
+  dismissOpeningNight: () => set((s) => ({
+    showOpeningNightModal: false,
+    ui: { ...s.ui, currentPhase: 'running' as GamePhase },
+    time: { ...s.time, isPaused: false, speed: 'normal' as SpeedSetting },
+  })),
+
   // ---- Show Closing ----
   closeShow: (showId: string, summary: RunSummary) => set((s) => ({
     shows: s.shows.map((show) =>
@@ -633,7 +648,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   getSerializableState: () => {
     const state = get();
     // Strip action functions, return only data
-    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, getSerializableState, loadState, ...data } = state;
+    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, setShowOpeningNightModal, dismissOpeningNight, getSerializableState, loadState, ...data } = state;
     return data as GameState;
   },
 

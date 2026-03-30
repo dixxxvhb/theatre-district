@@ -163,12 +163,22 @@ export function BuildPanel() {
       {/* Cancel / Done */}
       <div className="p-3 border-t border-amber-900/20 space-y-2">
         {selectedRoomType && (
-          <button
-            onClick={handleCancel}
-            className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors cursor-pointer"
-          >
-            Cancel Placement (Esc)
-          </button>
+          <>
+            <button
+              onClick={handleCancel}
+              className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors cursor-pointer"
+            >
+              Cancel Placement
+            </button>
+            <div className="flex items-center justify-center gap-3 text-[10px] text-gray-600">
+              <span>
+                <span className="inline-block bg-gray-800 border border-gray-600 rounded px-1 py-px font-mono text-gray-400">Esc</span> to cancel
+              </span>
+              <span>
+                <span className="inline-block bg-gray-800 border border-gray-600 rounded px-1 py-px font-mono text-gray-400">Right-click</span> to cancel
+              </span>
+            </div>
+          </>
         )}
 
         <button

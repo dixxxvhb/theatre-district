@@ -3,6 +3,62 @@ import { useGameStore } from '../../store/gameStore';
 import { AVAILABLE_PROPERTIES } from '../../game/data/properties';
 import type { Property } from '../../types';
 
+/** Small SVG grid preview showing lot dimensions proportionally */
+function GridPreview({ width, height }: { width: number; height: number }) {
+  const maxW = 120;
+  const maxH = 80;
+  const padding = 4;
+  const availW = maxW - padding * 2;
+  const availH = maxH - padding * 2;
+
+  // Scale to fit
+  const cellSize = Math.min(availW / width, availH / height);
+  const gridW = width * cellSize;
+  const gridH = height * cellSize;
+  const offsetX = (maxW - gridW) / 2;
+  const offsetY = (maxH - gridH) / 2;
+
+  return (
+    <svg width={maxW} height={maxH} className="mx-auto">
+      <rect x={0} y={0} width={maxW} height={maxH} fill="#0a0a1a" rx={4} />
+      {Array.from({ length: height }, (_, row) =>
+        Array.from({ length: width }, (_, col) => (
+          <rect
+            key={`${row}-${col}`}
+            x={offsetX + col * cellSize + 0.5}
+            y={offsetY + row * cellSize + 0.5}
+            width={cellSize - 1}
+            height={cellSize - 1}
+            fill="#1a1a2e"
+            stroke="#2a2a4e"
+            strokeWidth={0.5}
+            rx={0.5}
+          />
+        )),
+      )}
+      {/* Dimension label */}
+      <text
+        x={maxW / 2}
+        y={maxH - 3}
+        textAnchor="middle"
+        fill="#666"
+        fontSize={8}
+        fontFamily="monospace"
+      >
+        {width}x{height}
+      </text>
+    </svg>
+  );
+}
+
+const CONDITION_BADGE: Record<string, { bg: string; text: string }> = {
+  poor: { bg: 'bg-red-900/40 border-red-700/40', text: 'text-red-400' },
+  fair: { bg: 'bg-orange-900/40 border-orange-700/40', text: 'text-orange-400' },
+  good: { bg: 'bg-emerald-900/40 border-emerald-700/40', text: 'text-emerald-400' },
+  excellent: { bg: 'bg-blue-900/40 border-blue-700/40', text: 'text-blue-400' },
+  pristine: { bg: 'bg-purple-900/40 border-purple-700/40', text: 'text-purple-400' },
+};
+
 export function PropertySelect() {
   const cash = useGameStore((s) => s.economy.cash);
   const reputation = useGameStore((s) => s.reputation.score);
@@ -37,22 +93,8 @@ export function PropertySelect() {
     setPhase('building');
   };
 
-  const conditionColors: Record<string, string> = {
-    poor: 'text-red-400',
-    fair: 'text-yellow-400',
-    good: 'text-emerald-400',
-    excellent: 'text-blue-400',
-    pristine: 'text-purple-400',
-  };
-
-  const lotLabels: Record<string, string> = {
-    small: 'Small Lot',
-    medium: 'Medium Lot',
-    large: 'Large Lot',
-  };
-
   return (
-    <div className="w-full h-full flex flex-col bg-gray-950 overflow-auto">
+    <div className="w-full min-h-screen h-full flex flex-col bg-gray-950 overflow-auto">
       {/* Header */}
       <div className="text-center py-8 px-4">
         <h1
@@ -73,105 +115,106 @@ export function PropertySelect() {
       </div>
 
       {/* Property cards */}
-      <div className="flex-1 flex flex-wrap justify-center gap-4 px-6 pb-8">
+      <div className="flex-1 flex flex-wrap justify-center gap-5 px-6 pb-8">
         {AVAILABLE_PROPERTIES.map((property) => {
           const locked = property.unlockReputation > reputation;
           const tooExpensive = property.cost > cash;
           const disabled = locked || tooExpensive;
+          const isStarter = property.id === 'dusty_loft';
+          const badge = CONDITION_BADGE[property.condition];
+          const hasLocationBonus = property.locationBonus.attendance > 0 || property.locationBonus.ticketPrice > 0;
 
           return (
             <div
               key={property.id}
               onClick={() => !disabled && handleSelectProperty(property)}
-              className={`w-72 rounded-xl border p-5 transition-all flex flex-col ${
+              className={`w-72 rounded-xl border p-5 transition-all flex flex-col relative ${
                 disabled
                   ? 'border-gray-800/40 bg-gray-900/30 opacity-50 cursor-not-allowed'
                   : 'border-amber-900/40 bg-gray-900/70 hover:border-amber-600/60 hover:bg-gray-900/90 cursor-pointer hover:shadow-lg hover:shadow-amber-900/10'
               }`}
             >
-              {/* Name + lock icon */}
-              <div className="flex items-start justify-between mb-1">
-                <h3
-                  className="text-lg font-bold"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    color: disabled ? '#666' : '#d4a574',
-                  }}
-                >
-                  {property.name}
-                </h3>
-                {locked && (
-                  <span className="text-gray-600 text-lg" title={`Requires ${property.unlockReputation} reputation`}>
-                    [Locked]
-                  </span>
-                )}
-              </div>
-
-              <p className="text-gray-500 text-xs mb-3">{property.address}</p>
-
-              {/* Stats */}
-              <div className="space-y-1.5 text-sm flex-1">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Price</span>
-                  <span className={tooExpensive ? 'text-red-400' : 'text-amber-200'}>
-                    ${property.cost.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Lot Size</span>
-                  <span className="text-gray-300">{lotLabels[property.lot]}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Grid</span>
-                  <span className="text-gray-300">
-                    {property.gridSize.width} x {property.gridSize.height}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Condition</span>
-                  <span className={conditionColors[property.condition] ?? 'text-gray-300'}>
-                    {property.condition.charAt(0).toUpperCase() + property.condition.slice(1)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Max Seats</span>
-                  <span className="text-gray-300">{property.maxSeats.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Build Cost Mod</span>
-                  <span className={property.constructionCostModifier > 1 ? 'text-red-400' : property.constructionCostModifier < 1 ? 'text-emerald-400' : 'text-gray-300'}>
-                    {property.constructionCostModifier > 1 ? '+' : ''}
-                    {Math.round((property.constructionCostModifier - 1) * 100)}%
-                  </span>
-                </div>
-                {(property.locationBonus.attendance > 0 || property.locationBonus.ticketPrice > 0) && (
-                  <div className="pt-1 border-t border-gray-800">
-                    {property.locationBonus.attendance > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Attendance</span>
-                        <span className="text-emerald-400">
-                          +{Math.round(property.locationBonus.attendance * 100)}%
-                        </span>
-                      </div>
-                    )}
-                    {property.locationBonus.ticketPrice > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Ticket Price</span>
-                        <span className="text-emerald-400">
-                          +{Math.round(property.locationBonus.ticketPrice * 100)}%
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Reputation requirement */}
-              {locked && (
-                <div className="mt-3 text-center text-xs text-gray-600">
-                  Requires {property.unlockReputation} Reputation
+              {/* Starter badge */}
+              {isStarter && !disabled && (
+                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-emerald-900/60 border border-emerald-700/50 rounded-full text-emerald-300 text-[9px] uppercase tracking-wider font-semibold whitespace-nowrap">
+                  Recommended for Beginners
                 </div>
               )}
+
+              {/* Locked overlay */}
+              {locked && (
+                <div className="absolute inset-0 rounded-xl bg-gray-950/60 flex flex-col items-center justify-center z-10">
+                  <span className="text-gray-500 text-2xl mb-1">[Locked]</span>
+                  <span className="text-gray-600 text-xs">Requires {property.unlockReputation} Reputation</span>
+                </div>
+              )}
+
+              {/* Name */}
+              <h3
+                className="text-lg font-bold mb-0.5"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  color: disabled ? '#666' : '#d4a574',
+                }}
+              >
+                {property.name}
+              </h3>
+
+              <p className="text-gray-600 text-xs mb-3">{property.address}</p>
+
+              {/* Price — prominent */}
+              <div className="text-center mb-3">
+                <span
+                  className={`text-xl font-bold font-mono ${tooExpensive ? 'text-red-400' : ''}`}
+                  style={{ color: tooExpensive ? undefined : '#d4a574' }}
+                >
+                  ${property.cost.toLocaleString()}
+                </span>
+              </div>
+
+              {/* Grid Preview */}
+              <div className="mb-3">
+                <GridPreview width={property.gridSize.width} height={property.gridSize.height} />
+              </div>
+
+              {/* Condition badge + Max seats */}
+              <div className="flex items-center justify-between mb-3">
+                {badge && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${badge.bg} ${badge.text}`}
+                  >
+                    {property.condition}
+                  </span>
+                )}
+                <span className="text-gray-400 text-xs font-mono">
+                  {property.maxSeats.toLocaleString()} seats max
+                </span>
+              </div>
+
+              {/* Location bonus pills */}
+              {hasLocationBonus && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {property.locationBonus.attendance > 0 && (
+                    <span className="px-2 py-0.5 bg-emerald-900/30 border border-emerald-800/40 rounded-full text-emerald-400 text-[10px] font-mono">
+                      +{Math.round(property.locationBonus.attendance * 100)}% attendance
+                    </span>
+                  )}
+                  {property.locationBonus.ticketPrice > 0 && (
+                    <span className="px-2 py-0.5 bg-emerald-900/30 border border-emerald-800/40 rounded-full text-emerald-400 text-[10px] font-mono">
+                      +{Math.round(property.locationBonus.ticketPrice * 100)}% tickets
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Build cost modifier */}
+              <div className="flex justify-between text-xs border-t border-gray-800/40 pt-2">
+                <span className="text-gray-600">Build Cost</span>
+                <span className={property.constructionCostModifier > 1 ? 'text-red-400' : property.constructionCostModifier < 1 ? 'text-emerald-400' : 'text-gray-400'}>
+                  {property.constructionCostModifier > 1 ? '+' : ''}
+                  {Math.round((property.constructionCostModifier - 1) * 100)}%
+                </span>
+              </div>
             </div>
           );
         })}

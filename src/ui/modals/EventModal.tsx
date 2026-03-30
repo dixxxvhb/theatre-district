@@ -51,13 +51,14 @@ export function EventModal() {
           {unresolvedEvent.choices.map((choice) => {
             // Build hint text from effects
             const hints = choice.effects.map((e) => {
-              const sign = e.value >= 0 ? '+' : '';
+              const sign = e.value >= 0 ? '+' : '-';
+              const absVal = Math.abs(e.value);
               switch (e.type) {
-                case 'cash': return `${sign}$${e.value.toLocaleString()}`;
-                case 'reputation': return `${sign}${e.value} rep`;
-                case 'buzz': return `${sign}${e.value} buzz`;
-                case 'quality': return `${sign}${e.value} quality`;
-                case 'morale': return `${sign}${e.value} morale`;
+                case 'cash': return `${sign}$${absVal.toLocaleString()}`;
+                case 'reputation': return `${sign}${absVal} rep`;
+                case 'buzz': return `${sign}${absVal} buzz`;
+                case 'quality': return `${sign}${absVal} quality`;
+                case 'morale': return `${sign}${absVal} morale`;
                 default: return '';
               }
             }).filter(Boolean);
@@ -75,7 +76,7 @@ export function EventModal() {
                       <span
                         key={i}
                         className={`text-[10px] ${
-                          hint.startsWith('+') || hint.startsWith('$')
+                          hint.startsWith('+')
                             ? 'text-emerald-400'
                             : 'text-red-400'
                         }`}

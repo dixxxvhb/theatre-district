@@ -22,3 +22,76 @@ html, body, #root {
     transform: translateX(0);
   }
 }
+
+/* Opening Night Modal animations */
+@keyframes curtainRise {
+  0% { opacity: 0; transform: translateY(40px); }
+  60% { opacity: 1; transform: translateY(-5px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInSlow {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.opening-night-badge {
+  animation: fadeInSlow 0.6s ease-out both;
+  animation-delay: 0.2s;
+}
+
+.opening-night-title {
+  animation: curtainRise 0.8s ease-out both;
+  animation-delay: 0.4s;
+}
+
+.opening-night-subtitle {
+  animation: fadeInUp 0.6s ease-out both;
+  animation-delay: 0.9s;
+}
+
+.opening-night-divider {
+  animation: fadeInSlow 0.5s ease-out both;
+  animation-delay: 1.2s;
+}
+
+.opening-night-stats {
+  animation: fadeInUp 0.5s ease-out both;
+  animation-delay: 1.4s;
+}
+
+.opening-night-button {
+  animation: fadeInUp 0.5s ease-out both;
+  animation-delay: 1.8s;
+}
+
+/* Phase transition overlay */
+.phase-transition {
+  position: fixed;
+  inset: 0;
+  background: #0a0a12;
+  z-index: 100;
+  pointer-events: none;
+  animation: phaseFade 400ms ease-in-out forwards;
+}
+
+@keyframes phaseFade {
+  0% { opacity: 0; }
+  50% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+/* Run dashboard entrance */
+.run-dashboard-enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* End of run modal entrance */
+.end-of-run-enter {
+  animation: curtainRise 0.5s ease-out;
+}

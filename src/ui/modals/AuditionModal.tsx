@@ -44,10 +44,13 @@ function CandidateCard({
           : 'border-gray-800/50 bg-black/40 hover:border-gray-700/50 hover:bg-gray-900/30'
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-medium text-gray-200">{candidate.name}</span>
         <span className="text-xs text-gray-500">${candidate.salary.toLocaleString()}/wk</span>
       </div>
+      {candidate.personality && (
+        <div className="text-[10px] italic text-gray-500 mb-2 leading-tight">{candidate.personality}</div>
+      )}
       <div className="space-y-1">
         <TalentBar value={candidate.talent} label="Talent" />
         {roleType === 'lead' && (
@@ -119,6 +122,12 @@ export function AuditionModal() {
       if (candidate) {
         castRole(activeShow.id, currentCasting.role.id, candidate);
       }
+      // Clear selection so handleBeginRehearsal doesn't double-cast
+      setRoleCastings((prev) =>
+        prev.map((rc, i) =>
+          i === currentRoleIndex ? { ...rc, selectedCandidateId: null } : rc,
+        ),
+      );
     }
 
     if (currentRoleIndex < totalRoles - 1) {

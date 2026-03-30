@@ -9,6 +9,10 @@ const ADJECTIVES = [
   'Haunted', 'Scarlet', 'Fallen', 'Starless', 'Bitter', 'Stolen',
   'Hidden', 'Savage', 'Tender', 'Reckless', 'Phantom', 'Emerald',
   'Hollow', 'Twilight', 'Sacred', 'Restless', 'Untamed', 'Fading',
+  'Divine', 'Impossible', 'Last', 'First', 'Eternal', 'Twisted',
+  'Beautiful', 'Desperate', 'Wild', 'Fearless', 'Forgotten',
+  'Blazing', 'Furious', 'Luminous', 'Ruthless', 'Spectral',
+  'Vivid', 'Dazzling', 'Relentless', 'Tempestuous', 'Defiant',
 ];
 
 const NOUNS = [
@@ -16,20 +20,43 @@ const NOUNS = [
   'Garden', 'Masquerade', 'Shadow', 'Curtain', 'Overture', 'Legacy',
   'Tempest', 'Lullaby', 'Promise', 'Soliloquy', 'Reverie', 'Elegy',
   'Mirage', 'Canticle', 'Nocturne', 'Crescendo', 'Rhapsody', 'Aria',
-  'Labyrinth', 'Cascade', 'Silhouette', 'Dream', 'Midnight', 'Encore',
+  'Labyrinth', 'Cascade', 'Silhouette', 'Dream', 'Encore', 'Spotlight',
+  'Finale', 'Serenade', 'Cabaret', 'Carnival', 'Prologue',
+  'Confession', 'Inheritance', 'Coronation', 'Revolution', 'Paradox',
 ];
 
 const PLACES = [
   'Broadway', 'Harlem', 'Paris', 'Vienna', 'Havana', 'Montmartre',
   'Venice', 'Cairo', 'Babylon', 'Constantinople', 'Soho', 'Kyoto',
-  'Marrakech', 'Buenos Aires', 'Savannah',
+  'Marrakech', 'Buenos Aires', 'Savannah', 'Brooklyn', 'the Bowery',
+  'Fifth Avenue', 'Central Park', 'the Hudson', 'Times Square',
+  'the Village', 'London', 'the Bronx', 'the Left Bank', 'Seville',
 ];
 
 const NAMES = [
   'Eleanor', 'Marcus', 'Josephine', 'Dominic', 'Vivian', 'Theodore',
   'Celeste', 'Raphael', 'Beatrice', 'Lorenzo', 'Isadora', 'Solomon',
   'Adelaide', 'Cassius', 'Delilah', 'Ambrose', 'Cordelia', 'Valentine',
-  'Rosalind', 'Octavius',
+  'Rosalind', 'Octavius', 'Marguerite', 'Felix', 'Helena', 'Jasper',
+  'Mae', 'Gideon', 'Evangeline', 'Hugo', 'Lillian', 'Ezra',
+];
+
+const VERBS = [
+  'Leaving', 'Crossing', 'Burning', 'Chasing', 'Drowning',
+  'Waking', 'Forgetting', 'Becoming', 'Haunting', 'Finding',
+  'Breaking', 'Dancing', 'Falling', 'Rising', 'Stealing',
+];
+
+const SINGLE_WORDS = [
+  'Wicked', 'Rent', 'Chicago', 'Cabaret', 'Evita',
+  'Carousel', 'Follies', 'Ragtime', 'Newsies', 'Pippin',
+  'Company', 'Sweeney', 'Godspell', 'Nine', 'Grease',
+  'Dreamgirls', 'Hairspray', 'Matilda', 'Kinky', 'Hadestown',
+];
+
+const NUMBERS = [
+  'Nine', 'Forty-Second', 'Thirteen', 'Twenty-Five', 'Seven',
+  'Thirty-Nine', 'Eleven', 'Thousand', 'Five Hundred', 'Sixty-Six',
 ];
 
 function randomFrom<T>(arr: T[]): T {
@@ -58,7 +85,22 @@ const TITLE_TEMPLATES: TitleTemplate[] = [
   // "Name & the Noun"
   () => `${randomFrom(NAMES)} & the ${randomFrom(NOUNS)}`,
   // Single dramatic word
-  () => `${randomFrom(NOUNS)}!`,
+  () => randomFrom(SINGLE_WORDS),
+  // "[Number] [Noun]" — "Forty-Second Street", "Nine Lives"
+  () => `${randomFrom(NUMBERS)} ${randomFrom(NOUNS)}`,
+  // "The [Adjective] [Noun] of [Name]" — "The Secret Garden of Eleanor"
+  () => `The ${randomFrom(ADJECTIVES)} ${randomFrom(NOUNS)} of ${randomFrom(NAMES)}`,
+  // "[Verb]ing [Place]" — "Leaving Brooklyn", "Crossing Broadway"
+  () => `${randomFrom(VERBS)} ${randomFrom(PLACES)}`,
+  // "Dear [Name]" — "Dear Evan", "Dear Josephine"
+  () => `Dear ${randomFrom(NAMES)}`,
+  // "[Name] & [Name]" — "Marcus & Mae"
+  () => {
+    const a = randomFrom(NAMES);
+    let b: string;
+    do { b = randomFrom(NAMES); } while (b === a);
+    return `${a} & ${b}`;
+  },
 ];
 
 export function generateShowTitle(): string {
