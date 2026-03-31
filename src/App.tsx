@@ -5,7 +5,7 @@ import { MainMenu } from './ui/layouts/MainMenu';
 import { PropertySelect } from './ui/layouts/PropertySelect';
 import { BuildPanel } from './ui/panels/BuildPanel';
 import { StaffPanel } from './ui/panels/StaffPanel';
-import { MarketingPanel } from './ui/panels/MarketingPanel';
+import { RehearsalView } from './ui/panels/RehearsalView';
 import { ShowPickerModal } from './ui/modals/ShowPickerModal';
 import { AuditionModal } from './ui/modals/AuditionModal';
 import { EventModal } from './ui/modals/EventModal';
@@ -690,10 +690,9 @@ function App() {
         <div className="flex-1 flex relative">
           <div className="flex-1 relative">
             <GameCanvas />
-            <RehearsalOverlay />
             <TileInfo />
           </div>
-          <MarketingPanel />
+          <RehearsalView />
         </div>
         <OpeningNightModal />
         <RenovateOverlay />
