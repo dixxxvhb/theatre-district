@@ -119,6 +119,7 @@ export interface Room {
   condition: number;      // 0-100
   isConstructing: boolean;
   constructionDaysLeft: number;
+  presetId: string | null;
 }
 
 export interface Property {
@@ -293,12 +294,13 @@ export interface UIState {
   isPanelOpen: boolean;
   activePanel: string | null;
   notifications: Notification[];
+  isRenovating: boolean;
 }
 
 export interface Notification {
   id: string;
   message: string;
-  type: 'info' | 'warning' | 'success' | 'error';
+  type: NotificationType;
   day: number;
   read: boolean;
 }
@@ -334,6 +336,113 @@ export interface RunSummary {
   runDays: number;
 }
 
+// ---- Campaign & Rivals (v2.0) ----
+
+export type RivalPersonality = 'upstart' | 'corporate' | 'legacy';
+
+export interface RivalShow {
+  title: string;
+  genre: ShowGenre;
+  quality: number;
+  openDay: number;
+  closingDay: number | null;
+  attendance: number;
+}
+
+export interface RivalTheater {
+  id: string;
+  name: string;
+  personality: RivalPersonality;
+  reputation: number;
+  cash: number;
+  currentShow: RivalShow | null;
+  buzz: number;
+  showHistory: RivalShow[];
+  appearsAtAct: number;
+  active: boolean;
+}
+
+export interface Trend {
+  id: string;
+  name: string;
+  description: string;
+  effects: TrendEffect[];
+  durationRange: [number, number];
+}
+
+export interface TrendEffect {
+  type: 'attendance' | 'cost' | 'buzz' | 'critic';
+  genre?: ShowGenre;
+  archetype?: ShowArchetypeName;
+  multiplier: number;
+}
+
+export interface ActiveTrend {
+  trend: Trend;
+  showsRemaining: number;
+}
+
+export interface RoomPreset {
+  id: string;
+  roomType: RoomType;
+  name: string;
+  description: string;
+  visualTheme: {
+    primaryColor: number;
+    secondaryColor: number;
+    accentColor: number;
+    pattern: 'checker' | 'geometric' | 'brick' | 'plain' | 'wood';
+    decorations: string[];
+  };
+  modifiers: PresetModifiers;
+}
+
+export interface PresetModifiers {
+  ticketPriceBonus: number;
+  buildCostMultiplier: number;
+  maintenanceCostMultiplier: number;
+  capacityMultiplier: number;
+  qualityBonus: number;
+  reputationGainMultiplier: number;
+  crewCapacity?: number;
+  genreBonus?: { genre: ShowGenre; bonus: number }[];
+}
+
+export interface DirectorDecision {
+  id: string;
+  title: string;
+  description: string;
+  optionA: DirectorOption;
+  optionB: DirectorOption;
+}
+
+export interface DirectorOption {
+  label: string;
+  description: string;
+  effects: DirectorEffect[];
+}
+
+export interface DirectorEffect {
+  type: 'quality' | 'readiness' | 'morale' | 'cash' | 'days';
+  value: number;
+  chance?: number;
+}
+
+export interface CampaignState {
+  act: number;
+  showCount: number;
+  condemnedShowCount: number;
+  lowAttendanceWeeks: number;
+  currentTrend: ActiveTrend | null;
+  nextTrend: ActiveTrend | null;
+  tonyNominations: string[];
+  tonyWins: string[];
+  gameOver: boolean;
+  gameOverReason: string | null;
+}
+
+export type NotificationType = 'info' | 'money' | 'rival' | 'trend' | 'danger' | 'achievement' | 'warning' | 'success' | 'error';
+
 export interface GameState {
   // Meta
   initialized: boolean;
@@ -365,6 +474,10 @@ export interface GameState {
     y: number;
     zoom: number;
   };
+
+  // Campaign & Rivals (v2.0)
+  campaign: CampaignState;
+  rivals: RivalTheater[];
 
   // Performance / Run
   ticketPrice: number;
