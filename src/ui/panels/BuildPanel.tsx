@@ -1,5 +1,7 @@
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { ROOM_DEFINITIONS, REQUIRED_ROOMS } from '../../game/data/rooms';
+import { getPresetsForRoom, PRESET_ROOM_TYPES } from '../../game/data/presets';
 import type { RoomType, RoomDefinition } from '../../types';
 
 const ROOM_LIST: RoomDefinition[] = Object.values(ROOM_DEFINITIONS);
@@ -15,6 +17,9 @@ export function BuildPanel() {
   const activePropertyId = useGameStore((s) => s.activePropertyId);
   const cash = useGameStore((s) => s.economy.cash);
   const isRenovating = useGameStore((s) => s.ui.isRenovating);
+
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [showPresetPicker, setShowPresetPicker] = useState(false);
 
   const activeProperty = properties.find((p) => p.id === activePropertyId);
   const costModifier = activeProperty?.constructionCostModifier ?? 1;
@@ -32,6 +37,29 @@ export function BuildPanel() {
   // Check if all MVT rooms are at least placed (may be constructing)
   const mvtPlaced = MVT_ROOMS.every((rt) => allRoomTypes.has(rt));
 
+  // Watch for new rooms and apply preset
+  const roomCount = activeProperty?.rooms.length ?? 0;
+  const prevRoomCountRef = useRef(roomCount);
+
+  useEffect(() => {
+    if (roomCount > prevRoomCountRef.current && selectedPreset) {
+      const rooms = activeProperty?.rooms;
+      const newRoom = rooms?.[rooms.length - 1];
+      if (newRoom) {
+        useGameStore.getState().setRoomPreset(newRoom.id, selectedPreset);
+      }
+    }
+    prevRoomCountRef.current = roomCount;
+  }, [roomCount, selectedPreset, activeProperty]);
+
+  // Clear preset when room type deselected
+  useEffect(() => {
+    if (!selectedRoomType) {
+      setSelectedPreset(null);
+      setShowPresetPicker(false);
+    }
+  }, [selectedRoomType]);
+
   const handleDoneBuilding = () => {
     if (!mvtComplete) return;
     setPhase('production');
@@ -40,8 +68,18 @@ export function BuildPanel() {
   const handleSelectRoom = (type: RoomType) => {
     if (selectedRoomType === type) {
       selectRoomType(null);
+      setShowPresetPicker(false);
+      setSelectedPreset(null);
     } else {
       selectRoomType(type);
+      const hasPresets = (PRESET_ROOM_TYPES as readonly string[]).includes(type);
+      if (hasPresets) {
+        setShowPresetPicker(true);
+        setSelectedPreset(null);
+      } else {
+        setShowPresetPicker(false);
+        setSelectedPreset(null);
+      }
     }
   };
 
@@ -161,6 +199,74 @@ export function BuildPanel() {
           );
         })}
       </div>
+
+      {/* Preset picker */}
+      {showPresetPicker && selectedRoomType && (
+        <div className="p-3 border-t border-amber-900/20">
+          <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Choose Style</div>
+          <div className="space-y-1.5">
+            {getPresetsForRoom(selectedRoomType).map((preset) => {
+              const isPresetSelected = selectedPreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => {
+                    setSelectedPreset(isPresetSelected ? null : preset.id);
+                    setShowPresetPicker(false);
+                  }}
+                  className={`w-full text-left p-2.5 rounded-lg transition-all cursor-pointer border ${
+                    isPresetSelected
+                      ? 'border-amber-600/60 bg-amber-900/30'
+                      : 'border-transparent hover:border-gray-700/50 hover:bg-gray-900/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-5 h-5 rounded-sm flex-shrink-0 border border-gray-700/50"
+                      style={{ backgroundColor: `#${preset.visualTheme.primaryColor.toString(16).padStart(6, '0')}` }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm font-medium ${isPresetSelected ? 'text-amber-200' : 'text-gray-300'}`}>
+                        {preset.name}
+                      </span>
+                      <p className="text-[10px] text-gray-500 truncate">{preset.description}</p>
+                    </div>
+                  </div>
+                  {/* Modifier badges */}
+                  <div className="flex flex-wrap gap-1 mt-1.5 ml-7">
+                    {Object.entries(preset.modifiers).map(([key, value]) => {
+                      if (typeof value !== 'number' || value === 0) return null;
+                      const isPositive = value > 0;
+                      return (
+                        <span
+                          key={key}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                            isPositive
+                              ? 'bg-emerald-900/40 text-emerald-400'
+                              : 'bg-red-900/40 text-red-400'
+                          }`}
+                        >
+                          {isPositive ? '+' : ''}{value} {key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </button>
+              );
+            })}
+            {/* Skip preset option */}
+            <button
+              onClick={() => {
+                setSelectedPreset(null);
+                setShowPresetPicker(false);
+              }}
+              className="w-full text-center py-1.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors cursor-pointer"
+            >
+              Skip (no style bonus)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Cancel / Done — always visible at bottom */}
       <div className="flex-shrink-0 p-3 border-t border-amber-900/20 space-y-2">
