@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { MarketingPanel } from './MarketingPanel';
+import { RivalTicker } from '../components/RivalTicker';
 
 const GENRE_COLORS: Record<string, string> = {
   musical: 'bg-purple-900/40 text-purple-300 border-purple-700/40',
@@ -306,6 +307,9 @@ export function RunDashboard() {
             </div>
           )}
         </div>
+
+        {/* Rival Ticker */}
+        <RivalTicker />
 
         {/* Close Show */}
         <div className="p-4 mt-auto">
