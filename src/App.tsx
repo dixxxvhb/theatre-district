@@ -247,6 +247,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             }`}
           >
             Renovate
+            <Kbd>R</Kbd>
           </button>
         )}
 
@@ -419,6 +420,30 @@ function RehearsalOverlay() {
   );
 }
 
+function RenovateOverlay() {
+  const isRenovating = useGameStore((s) => s.ui.isRenovating);
+  if (!isRenovating) return null;
+
+  return (
+    <div className="absolute inset-0 z-40 flex">
+      <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
+      <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-3 border-b border-gray-800">
+          <span className="text-sm font-bold text-amber-300">Renovate</span>
+          <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
+          <button
+            onClick={() => useGameStore.getState().toggleRenovate()}
+            className="text-gray-500 hover:text-white text-xs cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+        <BuildPanel />
+      </div>
+    </div>
+  );
+}
+
 function PhaseTransitionOverlay() {
   return <div className="phase-transition" />;
 }
@@ -429,7 +454,6 @@ function App() {
   const events = useGameStore((s) => s.events);
   const initialized = useGameStore((s) => s.initialized);
   const isPaused = useGameStore((s) => s.time.isPaused);
-  const isRenovating = useGameStore((s) => s.ui.isRenovating);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
   const prevPhaseRef = useRef(currentPhase);
   const [showTransition, setShowTransition] = useState(false);
@@ -574,6 +598,7 @@ function App() {
           <GameCanvas />
         </div>
         <EndOfRunModal />
+        <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -630,24 +655,7 @@ function App() {
           </div>
           <StaffPanel />
         </div>
-        {isRenovating && (
-          <div className="absolute inset-0 z-40 flex">
-            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
-            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between p-3 border-b border-gray-800">
-                <span className="text-sm font-bold text-amber-300">Renovate</span>
-                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
-                <button
-                  onClick={() => useGameStore.getState().toggleRenovate()}
-                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-              <BuildPanel />
-            </div>
-          </div>
-        )}
+        <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -665,24 +673,7 @@ function App() {
           <GameCanvas />
         </div>
         <AuditionModal />
-        {isRenovating && (
-          <div className="absolute inset-0 z-40 flex">
-            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
-            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between p-3 border-b border-gray-800">
-                <span className="text-sm font-bold text-amber-300">Renovate</span>
-                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
-                <button
-                  onClick={() => useGameStore.getState().toggleRenovate()}
-                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-              <BuildPanel />
-            </div>
-          </div>
-        )}
+        <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -705,24 +696,7 @@ function App() {
           <MarketingPanel />
         </div>
         <OpeningNightModal />
-        {isRenovating && (
-          <div className="absolute inset-0 z-40 flex">
-            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
-            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between p-3 border-b border-gray-800">
-                <span className="text-sm font-bold text-amber-300">Renovate</span>
-                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
-                <button
-                  onClick={() => useGameStore.getState().toggleRenovate()}
-                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-              <BuildPanel />
-            </div>
-          </div>
-        )}
+        <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -744,24 +718,7 @@ function App() {
           <RunDashboard />
         </div>
         {hasUnresolvedEvent && <EventModal />}
-        {isRenovating && (
-          <div className="absolute inset-0 z-40 flex">
-            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
-            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between p-3 border-b border-gray-800">
-                <span className="text-sm font-bold text-amber-300">Renovate</span>
-                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
-                <button
-                  onClick={() => useGameStore.getState().toggleRenovate()}
-                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-              <BuildPanel />
-            </div>
-          </div>
-        )}
+        <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
