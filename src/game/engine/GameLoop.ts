@@ -11,6 +11,9 @@ import { calculateShowQuality } from '../systems/ShowSystem';
 import { rollForEvent, isAutoResolve } from '../systems/EventSystem';
 import { pushToast } from '../../ui/components/NotificationToast';
 import type { MarketingCampaignState } from '../../types';
+import { tickRivals, checkRivalActivation } from '../systems/RivalSystem';
+import { pickRandomTrend, rollTrendDuration } from '../data/trends';
+
 
 /**
  * Ticks required per game day at each speed setting.
@@ -66,6 +69,21 @@ export class GameLoop {
     // Marketing processes during both rehearsal and running
     if (phase === 'rehearsal' || phase === 'running') {
       this.processMarketing();
+    }
+
+    // 4. Rival simulation (all phases after building)
+    if (phase !== 'building' && phase !== 'menu' && phase !== 'property_select') {
+      tickRivals();
+    }
+
+    // 5. Loss condition checks (during running phase)
+    if (phase === 'running') {
+      const lossReason = store.checkLossConditions();
+      if (lossReason) {
+        store.setGameOver(lossReason);
+        store.setSpeed('paused');
+        return;
+      }
     }
   }
 
@@ -306,6 +324,66 @@ export class GameLoop {
         score: Math.max(0, Math.min(100, s.reputation.score + repChange)),
       },
     }));
+
+    // Campaign: increment show count and check act transition
+    state.incrementShowCount();
+
+    const updatedCampaign = useGameStore.getState().campaign;
+    const actThresholds = GAME_CONSTANTS.CAMPAIGN.ACT_THRESHOLDS;
+
+    // Check act transition
+    if (updatedCampaign.act < 5 && updatedCampaign.showCount >= actThresholds[updatedCampaign.act]) {
+      state.advanceAct();
+      checkRivalActivation();
+      pushToast(`Act ${updatedCampaign.act + 1}: The stakes rise...`, 'info');
+    }
+
+    // Track condemned shows (rep < 10)
+    const currentRep = useGameStore.getState().reputation.score;
+    if (currentRep < GAME_CONSTANTS.CAMPAIGN.CONDEMNED_REP_THRESHOLD) {
+      useGameStore.setState((s) => ({
+        campaign: { ...s.campaign, condemnedShowCount: s.campaign.condemnedShowCount + 1 },
+      }));
+    } else {
+      useGameStore.setState((s) => ({
+        campaign: { ...s.campaign, condemnedShowCount: 0 },
+      }));
+    }
+
+    // Tony nomination check
+    if (
+      avgAttPct > GAME_CONSTANTS.CAMPAIGN.TONY_QUALITY_THRESHOLD &&
+      showPerfs.length > GAME_CONSTANTS.CAMPAIGN.TONY_PERFORMANCE_THRESHOLD &&
+      updatedCampaign.act >= GAME_CONSTANTS.CAMPAIGN.TONY_MIN_ACT
+    ) {
+      state.nominateForTony(activeShow.id);
+      pushToast(`"${activeShow.title}" earns a Tony nomination!`, 'info');
+    }
+
+    // Trend advancement
+    if (updatedCampaign.currentTrend) {
+      const remaining = updatedCampaign.currentTrend.showsRemaining - 1;
+      if (remaining <= 0) {
+        if (updatedCampaign.nextTrend) {
+          state.setTrend(updatedCampaign.nextTrend);
+          state.setNextTrend(null);
+          pushToast(`${updatedCampaign.nextTrend.trend.name} takes hold`, 'info');
+        } else {
+          state.setTrend(null);
+        }
+      } else {
+        state.setTrend({ ...updatedCampaign.currentTrend, showsRemaining: remaining });
+      }
+    }
+
+    // Queue next trend preview
+    if (!updatedCampaign.nextTrend && updatedCampaign.showCount > 1 && Math.random() > 0.3) {
+      const excludeId = updatedCampaign.currentTrend?.trend.id;
+      const nextTrend = pickRandomTrend(excludeId);
+      const duration = rollTrendDuration(nextTrend);
+      state.setNextTrend({ trend: nextTrend, showsRemaining: duration });
+      pushToast(`Word on the street: ${nextTrend.description}`, 'info');
+    }
 
     pushToast(`Show closed: ${_reason}`, 'warning');
 
