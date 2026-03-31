@@ -1,6 +1,9 @@
 import { Container, Graphics, Rectangle, Text, TextStyle } from 'pixi.js';
 import { TILE, ROOM_COLORS } from '../data/constants';
-import type { GridState, Position, Room, RoomType } from '../../types';
+import { renderRoom } from './RoomRenderer';
+import { renderConstruction } from './ConstructionRenderer';
+import { renderConnections } from './ConnectionRenderer';
+import type { GridState, Position, Room, RoomType, GamePhase } from '../../types';
 
 /** Abbreviated labels for room types, shown centered in rooms */
 const ROOM_LABELS: Record<RoomType, string> = {
@@ -41,6 +44,9 @@ export class FloorPlanRenderer {
   private hoveredCell: Position | null = null;
   private selectedCell: Position | null = null;
   private constructingRooms: Room[] = [];
+  private rooms: Room[] = [];
+  private connectionGraphics: Graphics;
+  private currentPhase: GamePhase = 'building';
 
   private onCellClick: ((x: number, y: number) => void) | null = null;
   private onCellHover: ((x: number, y: number) => void) | null = null;
@@ -61,6 +67,9 @@ export class FloorPlanRenderer {
     this.emptyCellGraphics = new Graphics();
     this.emptyCellGraphics.label = 'emptyCells';
 
+    this.connectionGraphics = new Graphics();
+    this.connectionGraphics.label = 'connections';
+
     this.gridGraphics = new Graphics();
     this.gridGraphics.label = 'gridLines';
 
@@ -78,6 +87,7 @@ export class FloorPlanRenderer {
 
     this.container.addChild(this.cellGraphics);
     this.container.addChild(this.emptyCellGraphics);
+    this.container.addChild(this.connectionGraphics);
     this.container.addChild(this.roomBorderGraphics);
     this.container.addChild(this.gridGraphics);
     this.container.addChild(this.constructionGraphics);
@@ -104,10 +114,12 @@ export class FloorPlanRenderer {
   }
 
   /** Update with new grid data */
-  update(grid: GridState, selectedTile: Position | null, constructingRooms?: Room[]): void {
+  update(grid: GridState, selectedTile: Position | null, constructingRooms?: Room[], allRooms?: Room[], phase?: GamePhase): void {
     this.gridState = grid;
     this.selectedCell = selectedTile;
     this.constructingRooms = constructingRooms ?? [];
+    this.rooms = allRooms ?? [];
+    this.currentPhase = phase ?? 'building';
 
     // Set hit area so pointer events work on the full grid area
     if (grid.width > 0 && grid.height > 0) {
@@ -123,6 +135,7 @@ export class FloorPlanRenderer {
     this.drawRoomBorders();
     this.drawGridLines();
     this.drawConstructionOverlay();
+    this.drawConnections();
     this.drawRoomLabels();
     this.drawSelection();
   }
@@ -130,10 +143,9 @@ export class FloorPlanRenderer {
   /** Animate construction overlay pulse — call from game loop or ticker */
   tick(deltaMs: number): void {
     this.animationTime += deltaMs;
-    // Update construction overlay alpha with pulsing
-    if (this.constructingRooms.length > 0) {
-      const pulse = 0.3 + 0.3 * Math.sin(this.animationTime * 0.003);
-      this.constructionGraphics.alpha = pulse;
+    // Redraw cells to update phase-based animations
+    if (this.rooms.length > 0) {
+      this.drawCells();
     }
   }
 
@@ -161,19 +173,37 @@ export class FloorPlanRenderer {
     const { width, height, cells } = this.gridState;
     const s = TILE.FLOOR_SIZE;
 
+    // First pass: fill empty cells only
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const cell = cells[y * width + x];
-        const colorKey = cell.type === 'room' && cell.roomType
-          ? cell.roomType
-          : cell.type === 'empty'
-            ? 'empty'
-            : cell.type;
-        const color = ROOM_COLORS[colorKey] ?? ROOM_COLORS.empty;
-
-        g.rect(x * s, y * s, s, s);
-        g.fill(color);
+        if (cell.type === 'empty') {
+          g.rect(x * s, y * s, s, s);
+          g.fill(ROOM_COLORS.empty);
+        }
       }
+    }
+
+    // Second pass: draw illustrated rooms
+    for (const room of this.rooms) {
+      if (room.isConstructing) continue;
+      const px = room.position.x * s;
+      const py = room.position.y * s;
+      const pw = room.size.width * s;
+      const ph = room.size.height * s;
+      renderRoom(g, room, px, py, pw, ph, this.currentPhase, this.animationTime);
+    }
+
+    // Third pass: constructing rooms get base color
+    for (const room of this.constructingRooms) {
+      if (!room.isConstructing) continue;
+      const px = room.position.x * s;
+      const py = room.position.y * s;
+      const pw = room.size.width * s;
+      const ph = room.size.height * s;
+      const colorKey = room.type;
+      const color = ROOM_COLORS[colorKey] ?? ROOM_COLORS.empty;
+      g.rect(px, py, pw, ph).fill({ color, alpha: 0.3 });
     }
   }
 
@@ -345,31 +375,22 @@ export class FloorPlanRenderer {
 
     for (const room of this.constructingRooms) {
       if (!room.isConstructing) continue;
-      const { x, y } = room.position;
-      const { width: rw, height: rh } = room.size;
+      const px = room.position.x * s;
+      const py = room.position.y * s;
+      const pw = room.size.width * s;
+      const ph = room.size.height * s;
 
-      const px = x * s;
-      const py = y * s;
-      const pw = rw * s;
-      const ph = rh * s;
-
-      // Semi-transparent overlay that will pulse via tick()
-      g.rect(px, py, pw, ph);
-      g.fill({ color: 0xffffff, alpha: 0.15 });
-
-      // Diagonal hatching lines
-      g.setStrokeStyle({ width: 1, color: 0xffffff, alpha: 0.25 });
-      const step = 8;
-      for (let i = -ph; i < pw; i += step) {
-        const x1 = Math.max(0, i);
-        const y1 = Math.max(0, -i);
-        const x2 = Math.min(pw, i + ph);
-        const y2 = Math.min(ph, ph - (i + ph - x2));
-        g.moveTo(px + x1, py + y1);
-        g.lineTo(px + x2, py + y2);
-      }
-      g.stroke();
+      const totalDays = room.constructionDaysLeft + 5; // approximate
+      renderConstruction(g, room, px, py, pw, ph, totalDays, this.animationTime);
     }
+  }
+
+  private drawConnections(): void {
+    const g = this.connectionGraphics;
+    g.clear();
+
+    if (this.rooms.length < 2) return;
+    renderConnections(g, this.rooms, TILE.FLOOR_SIZE);
   }
 
   /** Draw room name labels centered in each room */

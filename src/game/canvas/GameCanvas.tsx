@@ -35,6 +35,7 @@ export function GameCanvas() {
   const selectedRoomType = useGameStore((s) => s.ui.selectedRoomType);
   const properties = useGameStore((s) => s.properties);
   const activePropertyId = useGameStore((s) => s.activePropertyId);
+  const currentPhase = useGameStore((s) => s.ui.currentPhase);
   const setCamera = useGameStore((s) => s.setCamera);
   const selectTile = useGameStore((s) => s.selectTile);
   const setViewMode = useGameStore((s) => s.setViewMode);
@@ -430,13 +431,14 @@ export function GameCanvas() {
     if (viewMode === 'floorplan') {
       floorPlan.getContainer().visible = true;
       isometric.getContainer().visible = false;
-      floorPlan.update(grid, selectedTile, constructingRooms);
+      const allRooms = activeProperty?.rooms ?? [];
+      floorPlan.update(grid, selectedTile, constructingRooms, allRooms, currentPhase);
     } else {
       floorPlan.getContainer().visible = false;
       isometric.getContainer().visible = true;
       isometric.update(grid, selectedTile);
     }
-  }, [viewMode, grid, selectedTile, properties, activePropertyId]);
+  }, [viewMode, grid, selectedTile, properties, activePropertyId, currentPhase]);
 
   // Update camera transform
   useEffect(() => {
