@@ -21,17 +21,35 @@ const GENRE_COLORS: Record<ShowGenre, string> = {
   one_person_show: '#6ee7b7',
 };
 
+const CARD_ROTATIONS = ['-2deg', '0deg', '2deg'];
+
+function getTrendIndicator(genre: ShowGenre): 'positive' | 'neutral' | 'negative' {
+  const trend = useGameStore.getState().campaign.currentTrend;
+  if (!trend) return 'neutral';
+  const genreEffect = trend.trend.effects.find(
+    (e) => e.type === 'attendance' && e.genre === genre,
+  );
+  if (!genreEffect) return 'neutral';
+  return genreEffect.multiplier > 1 ? 'positive' : 'negative';
+}
+
+const TREND_BORDER: Record<'positive' | 'neutral' | 'negative', string> = {
+  positive: 'border-emerald-500/60 shadow-emerald-500/20',
+  negative: 'border-red-500/60 shadow-red-500/20',
+  neutral: 'border-amber-700/40',
+};
+
 function QualityBar({ value, label, color = '#d4a574' }: { value: number; label: string; color?: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500 w-16 text-right shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+      <span className="text-xs text-amber-900/60 w-16 text-right shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-amber-900/20 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${value}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-xs text-gray-400 w-7 text-right">{value}</span>
+      <span className="text-xs text-amber-800/60 w-7 text-right">{value}</span>
     </div>
   );
 }
@@ -43,7 +61,7 @@ function ComplexityPips({ value }: { value: number }) {
         <div
           key={i}
           className={`w-2 h-2 rounded-sm ${
-            i < value ? 'bg-amber-500' : 'bg-gray-800'
+            i < value ? 'bg-amber-600' : 'bg-amber-900/20'
           }`}
         />
       ))}
@@ -54,65 +72,141 @@ function ComplexityPips({ value }: { value: number }) {
 function ShowCard({
   show,
   selected,
+  dimmed,
+  rotation,
   onSelect,
 }: {
   show: Show;
   selected: boolean;
+  dimmed: boolean;
+  rotation: string;
   onSelect: () => void;
 }) {
   const archetype = SHOW_ARCHETYPES[show.archetype];
+  const trendIndicator = getTrendIndicator(show.genre);
 
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-4 rounded-xl transition-all cursor-pointer border ${
+      className={`w-full text-left p-5 rounded-lg transition-all duration-300 cursor-pointer border-2 shadow-lg ${
+        TREND_BORDER[trendIndicator]
+      } ${
         selected
-          ? 'border-amber-500/60 bg-amber-950/30 shadow-lg shadow-amber-900/20'
-          : 'border-gray-800/60 bg-black/60 hover:border-gray-700/60 hover:bg-gray-900/40'
+          ? 'ring-2 ring-amber-400/60 z-10'
+          : ''
+      } ${
+        dimmed ? 'opacity-40 scale-95' : 'hover:scale-[1.02]'
       }`}
+      style={{
+        transform: `rotate(${selected ? '0deg' : rotation}) ${selected ? 'scale(1.05)' : dimmed ? 'scale(0.95)' : ''}`,
+        background: 'linear-gradient(180deg, #fefce8 0%, #fef3c7 40%, #fde68a20 100%)',
+        fontFamily: 'Georgia, "Times New Roman", serif',
+      }}
     >
-      {/* Genre tag */}
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full"
-          style={{
-            color: GENRE_COLORS[show.genre],
-            backgroundColor: `${GENRE_COLORS[show.genre]}15`,
-            border: `1px solid ${GENRE_COLORS[show.genre]}30`,
-          }}
-        >
-          {GENRE_LABELS[show.genre]}
-        </span>
-        <span className="text-[10px] text-gray-600 uppercase tracking-wider">
-          {archetype.label}
-        </span>
+      {/* Script cover top line */}
+      <div className="border-b border-amber-300/40 pb-2 mb-3">
+        <div className="flex items-center justify-between">
+          <span
+            className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full"
+            style={{
+              color: GENRE_COLORS[show.genre],
+              backgroundColor: `${GENRE_COLORS[show.genre]}25`,
+              border: `1px solid ${GENRE_COLORS[show.genre]}40`,
+            }}
+          >
+            {GENRE_LABELS[show.genre]}
+          </span>
+          <span className="text-[10px] text-amber-700/50 uppercase tracking-wider font-sans">
+            {archetype.label}
+          </span>
+        </div>
       </div>
 
       {/* Title */}
-      <h3
-        className="text-lg font-bold text-gray-100 mb-3 leading-tight"
-        style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-      >
+      <h3 className="text-lg font-bold text-amber-950 mb-1 leading-tight italic">
         {show.title}
       </h3>
 
+      {/* Decorative line */}
+      <div className="w-12 h-px bg-amber-400/50 mb-3" />
+
+      {/* Trend label */}
+      {trendIndicator !== 'neutral' && (
+        <div className={`text-[10px] uppercase tracking-wider font-sans mb-2 ${
+          trendIndicator === 'positive' ? 'text-emerald-700' : 'text-red-700'
+        }`}>
+          {trendIndicator === 'positive' ? 'Trending' : 'Against Trend'}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="space-y-1.5 mb-3">
-        <QualityBar value={show.scriptQuality} label="Script" color="#d4a574" />
-        <QualityBar value={show.audienceAppeal} label="Appeal" color="#8b2252" />
+        <QualityBar value={show.scriptQuality} label="Script" color="#92400e" />
+        <QualityBar value={show.audienceAppeal} label="Appeal" color="#9f1239" />
       </div>
 
       {/* Bottom row */}
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between text-xs font-sans border-t border-amber-300/30 pt-2">
         <div className="flex items-center gap-2">
-          <span className="text-gray-500">Complexity</span>
+          <span className="text-amber-800/50">Complexity</span>
           <ComplexityPips value={show.complexity} />
         </div>
-        <span className="text-gray-500">
+        <span className="text-amber-800/50">
           Cast: {show.idealCastSize}
         </span>
-        <span className="text-gray-400">
+        <span className="text-amber-900/70 font-medium">
           ${(show.idealBudget / 1000).toFixed(0)}K
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function CommissionCard({
+  cost,
+  canAfford,
+  onClick,
+}: {
+  cost: number;
+  canAfford: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={!canAfford}
+      className={`w-full text-left p-5 rounded-lg transition-all duration-300 border-2 border-dashed shadow-md ${
+        canAfford
+          ? 'border-amber-600/30 hover:border-amber-500/50 hover:scale-[1.02] cursor-pointer'
+          : 'border-gray-700/30 opacity-40 cursor-not-allowed'
+      }`}
+      style={{
+        transform: 'rotate(1deg)',
+        background: canAfford
+          ? 'linear-gradient(180deg, #fefce810 0%, #fef3c705 100%)'
+          : 'linear-gradient(180deg, #1c1917 0%, #0c0a09 100%)',
+      }}
+    >
+      <div className="flex flex-col items-center justify-center h-full min-h-[180px] gap-3">
+        {/* Blank page icon */}
+        <div className="w-12 h-16 border-2 border-dashed border-amber-700/30 rounded-sm flex items-center justify-center">
+          <span className="text-amber-700/40 text-2xl">+</span>
+        </div>
+        <span
+          className="text-sm text-amber-200/60 italic"
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+        >
+          Commission Custom Script
+        </span>
+        <span className={`text-xs font-sans px-2 py-0.5 rounded-full ${
+          canAfford
+            ? 'bg-purple-900/40 text-purple-300 border border-purple-700/40'
+            : 'bg-gray-800/40 text-gray-500 border border-gray-700/40'
+        }`}>
+          ${(cost / 1000).toFixed(0)}K
+        </span>
+        <span className="text-[10px] text-gray-500 font-sans">
+          +{GAME_CONSTANTS.COMMISSION.SCRIPT_QUALITY_BONUS} script quality bonus
         </span>
       </div>
     </button>
@@ -165,9 +259,12 @@ export function ShowPickerModal() {
     const show = showOptions[0];
     return (
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-950/95 border border-amber-900/30 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+        <div
+          className="rounded-2xl p-8 max-w-md w-full shadow-2xl border border-amber-900/30"
+          style={{ background: 'linear-gradient(180deg, #451a03ee 0%, #1c1917ee 100%)' }}
+        >
           <h2
-            className="text-2xl font-bold text-amber-200 mb-2 text-center"
+            className="text-2xl font-bold text-amber-200 mb-2 text-center italic"
             style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
             Show Commissioned
@@ -179,6 +276,8 @@ export function ShowPickerModal() {
           <ShowCard
             show={show}
             selected={true}
+            dimmed={false}
+            rotation="0deg"
             onSelect={() => {}}
           />
 
@@ -195,69 +294,70 @@ export function ShowPickerModal() {
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-950/95 border border-amber-900/30 rounded-2xl p-6 max-w-3xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div
+        className="rounded-2xl p-6 max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto border border-amber-900/30"
+        style={{ background: 'linear-gradient(180deg, #451a03f2 0%, #1c1917f2 100%)' }}
+      >
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-8">
           <h2
-            className="text-2xl font-bold text-amber-200 mb-1"
+            className="text-3xl font-bold text-amber-200 mb-1 italic"
             style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
-            Select Your Show
+            The Pitch Meeting
           </h2>
-          <p className="text-gray-500 text-sm">
-            Choose a script for your next production, or commission a custom one.
+          <p className="text-amber-700/60 text-sm">
+            Three scripts on your desk. Choose wisely, or commission something new.
           </p>
+          {/* Decorative divider */}
+          <div className="flex items-center justify-center gap-3 mt-3">
+            <div className="w-16 h-px bg-amber-700/30" />
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-700/40" />
+            <div className="w-16 h-px bg-amber-700/30" />
+          </div>
         </div>
 
-        {/* Show cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {showOptions.map((show) => (
+        {/* Script cards on desk */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8 items-start">
+          {showOptions.map((show, i) => (
             <ShowCard
               key={show.id}
               show={show}
               selected={selectedId === show.id}
+              dimmed={selectedId !== null && selectedId !== show.id}
+              rotation={CARD_ROTATIONS[i % CARD_ROTATIONS.length]}
               onSelect={() => setSelectedId(show.id)}
             />
           ))}
+
+          {/* Commission card */}
+          <CommissionCard
+            cost={commissionCost}
+            canAfford={canCommission}
+            onClick={handleCommission}
+          />
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-3">
+        {/* Select button */}
+        <div className="flex items-center justify-center">
           <button
             onClick={handleSelect}
             disabled={!selectedId}
-            className={`flex-1 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer border ${
+            className={`px-10 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer border ${
               selectedId
-                ? 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200 hover:bg-emerald-900/60'
+                ? 'bg-emerald-900/50 border-emerald-600/50 text-emerald-200 hover:bg-emerald-900/70 shadow-lg shadow-emerald-900/20'
                 : 'bg-gray-900/40 border-gray-800/40 text-gray-600 cursor-not-allowed'
             }`}
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
-            Select Show
-          </button>
-
-          <div className="text-gray-700">or</div>
-
-          <button
-            onClick={handleCommission}
-            disabled={!canCommission}
-            className={`flex-1 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer border ${
-              canCommission
-                ? 'bg-purple-900/40 border-purple-700/50 text-purple-200 hover:bg-purple-900/60'
-                : 'bg-gray-900/40 border-gray-800/40 text-gray-600 cursor-not-allowed'
-            }`}
-          >
-            Commission (${(commissionCost / 1000).toFixed(0)}K)
+            {selectedId ? 'Greenlight This Show' : 'Select a Script'}
           </button>
         </div>
-
-        <p className="text-center text-gray-600 text-xs mt-3">
-          Commissioning costs ${commissionCost.toLocaleString()} and grants +{GAME_CONSTANTS.COMMISSION.SCRIPT_QUALITY_BONUS} script quality.
-        </p>
 
         {/* Back to building */}
         <button
           onClick={() => setPhase('building')}
-          className="w-full mt-4 py-2 text-xs text-gray-600 hover:text-gray-400 transition-colors cursor-pointer"
+          className="w-full mt-4 py-2 text-xs text-amber-800/40 hover:text-amber-600/60 transition-colors cursor-pointer"
         >
           Back to Building
         </button>
