@@ -187,6 +187,20 @@ export const GAME_CONSTANTS = {
     CHECK_INTERVAL_DAYS: 7,    // check for random events weekly
     EVENT_CHANCE: 0.3,         // 30% chance per check
   },
+
+  // Campaign (v2.0)
+  CAMPAIGN: {
+    ACT_THRESHOLDS: [0, 2, 5, 8, 10],
+    CONDEMNED_REP_THRESHOLD: 10,
+    LOW_ATTENDANCE_THRESHOLD: 0.20,
+    OUTCOMPETED_RIVAL_THRESHOLD: 0.60,
+    TONY_QUALITY_THRESHOLD: 80,
+    TONY_PERFORMANCE_THRESHOLD: 60,
+    TONY_MIN_ACT: 4,
+    TREND_EARLY_SHIFT_CHANCE: 0.15,
+    DIRECTOR_DECISION_INTERVAL: [5, 7],
+    RUSH_BUILD_MULTIPLIER: 1.5,
+  },
 } as const;
 
 export type GameConstants = typeof GAME_CONSTANTS;

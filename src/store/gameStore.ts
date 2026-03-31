@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { GameState, GamePhase, ViewMode, RoomType, Position, Size, SpeedSetting, GridCell, Show, CrewMember, CastMember, MarketingCampaignState, PerformanceResult, RehearsalLogEntry, RunSummary, EventEffect } from '../types';
+import type { GameState, GamePhase, ViewMode, RoomType, Position, Size, SpeedSetting, GridCell, Show, CrewMember, CastMember, MarketingCampaignState, PerformanceResult, RehearsalLogEntry, RunSummary, EventEffect, RivalTheater, CampaignState, ActiveTrend } from '../types';
 import { GAME_CONSTANTS } from '../game/data/constants';
 import { ROOM_DEFINITIONS } from '../game/data/rooms';
 import { canPlaceRoom, placeRoomOnGrid, removeRoomFromGrid } from '../game/systems/BuildingSystem';
+import { createAllRivals } from '../game/data/rivals';
 
 const initialState: GameState = {
   initialized: false,
@@ -39,6 +40,7 @@ const initialState: GameState = {
     isPanelOpen: false,
     activePanel: null,
     notifications: [],
+    isRenovating: false,
   },
 
   properties: [],
@@ -70,6 +72,20 @@ const initialState: GameState = {
   lowAttendanceStreak: 0,
   runSummary: null,
   showOpeningNightModal: false,
+
+  campaign: {
+    act: 1,
+    showCount: 0,
+    condemnedShowCount: 0,
+    lowAttendanceWeeks: 0,
+    currentTrend: null,
+    nextTrend: null,
+    tonyNominations: [],
+    tonyWins: [],
+    gameOver: false,
+    gameOverReason: null,
+  },
+  rivals: [],
 };
 
 interface GameActions {
@@ -150,6 +166,29 @@ interface GameActions {
   closeShow: (showId: string, summary: RunSummary) => void;
   clearRunSummary: () => void;
 
+  // Renovate (v2.0)
+  toggleRenovate: () => void;
+
+  // Campaign (v2.0)
+  advanceAct: () => void;
+  checkLossConditions: () => string | null;
+  incrementShowCount: () => void;
+  setTrend: (trend: ActiveTrend | null) => void;
+  setNextTrend: (trend: ActiveTrend | null) => void;
+  setGameOver: (reason: string) => void;
+
+  // Rivals (v2.0)
+  initRivals: () => void;
+  activateRival: (rivalId: string) => void;
+  updateRival: (rivalId: string, updates: Partial<RivalTheater>) => void;
+
+  // Presets (v2.0)
+  setRoomPreset: (roomId: string, presetId: string) => void;
+
+  // Tony (v2.0)
+  nominateForTony: (showId: string) => void;
+  awardTony: (showId: string) => void;
+
   // Serialization
   getSerializableState: () => GameState;
   loadState: (state: GameState) => void;
@@ -159,9 +198,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   ...initialState,
 
   initGame: (theaterName: string) => set({
+    ...initialState,
     initialized: true,
     theaterName,
     ui: { ...initialState.ui, currentPhase: 'property_select' },
+    rivals: createAllRivals(),
   }),
 
   resetGame: () => set(initialState),
@@ -282,7 +323,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const defaultArea = roomDef.defaultSize.width * roomDef.defaultSize.height;
     const actualArea = size.width * size.height;
     const areaScale = actualArea / defaultArea;
-    const adjustedCost = Math.round(roomDef.baseCost * areaScale * activeProperty.constructionCostModifier);
+    const rushMultiplier = state.ui.currentPhase !== 'building' ? 1.5 : 1.0;
+    const adjustedCost = Math.round(roomDef.baseCost * areaScale * activeProperty.constructionCostModifier * rushMultiplier);
     if (state.economy.cash < adjustedCost) return false;
 
     // Create room
@@ -296,6 +338,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       condition: 100,
       isConstructing: true,
       constructionDaysLeft: Math.round(roomDef.buildDays * Math.sqrt(areaScale)),
+      presetId: null,
     };
 
     // Update grid
@@ -651,9 +694,107 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   getSerializableState: () => {
     const state = get();
     // Strip action functions, return only data
-    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, setShowOpeningNightModal, dismissOpeningNight, getSerializableState, loadState, ...data } = state;
+    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, setShowOpeningNightModal, dismissOpeningNight, getSerializableState, loadState, toggleRenovate, advanceAct, checkLossConditions, incrementShowCount, setTrend, setNextTrend, setGameOver, initRivals, activateRival, updateRival, setRoomPreset, nominateForTony, awardTony, ...data } = state;
     return data as GameState;
   },
 
   loadState: (state) => set(state),
+
+  // ---- Renovate (v2.0) ----
+  toggleRenovate: () => set((s) => ({
+    ui: { ...s.ui, isRenovating: !s.ui.isRenovating },
+  })),
+
+  // ---- Campaign (v2.0) ----
+  advanceAct: () => set((s) => ({
+    campaign: { ...s.campaign, act: Math.min(5, s.campaign.act + 1) },
+  })),
+
+  checkLossConditions: () => {
+    const s = get();
+    if (s.economy.cash <= 0) {
+      const activeProperty = s.properties.find((p) => p.id === s.activePropertyId);
+      const hasRoomsToSell = activeProperty ? activeProperty.rooms.length > 0 : false;
+      const hasActiveShow = s.shows.some((sh) => sh.isRunning);
+      if (!hasRoomsToSell && !hasActiveShow) {
+        return 'bankruptcy';
+      }
+    }
+    if (s.campaign.condemnedShowCount >= 3) {
+      return 'reputation_death';
+    }
+    if (s.campaign.lowAttendanceWeeks >= 4) {
+      const rivalThriving = s.rivals.some(
+        (r) => r.active && r.currentShow && r.currentShow.attendance > 60,
+      );
+      if (rivalThriving) {
+        return 'outcompeted';
+      }
+    }
+    return null;
+  },
+
+  incrementShowCount: () => set((s) => ({
+    campaign: { ...s.campaign, showCount: s.campaign.showCount + 1 },
+  })),
+
+  setTrend: (trend) => set((s) => ({
+    campaign: { ...s.campaign, currentTrend: trend },
+  })),
+
+  setNextTrend: (trend) => set((s) => ({
+    campaign: { ...s.campaign, nextTrend: trend },
+  })),
+
+  setGameOver: (reason) => set((s) => ({
+    campaign: { ...s.campaign, gameOver: true, gameOverReason: reason },
+  })),
+
+  // ---- Rivals (v2.0) ----
+  initRivals: () => set({ rivals: createAllRivals() }),
+
+  activateRival: (rivalId) => set((s) => ({
+    rivals: s.rivals.map((r) =>
+      r.id === rivalId ? { ...r, active: true } : r,
+    ),
+  })),
+
+  updateRival: (rivalId, updates) => set((s) => ({
+    rivals: s.rivals.map((r) =>
+      r.id === rivalId ? { ...r, ...updates } : r,
+    ),
+  })),
+
+  // ---- Presets (v2.0) ----
+  setRoomPreset: (roomId, presetId) => set((s) => ({
+    properties: s.properties.map((p) =>
+      p.id === s.activePropertyId
+        ? {
+            ...p,
+            rooms: p.rooms.map((r) =>
+              r.id === roomId ? { ...r, presetId } : r,
+            ),
+          }
+        : p,
+    ),
+  })),
+
+  // ---- Tony (v2.0) ----
+  nominateForTony: (showId) => set((s) => ({
+    campaign: {
+      ...s.campaign,
+      tonyNominations: [...s.campaign.tonyNominations, showId],
+    },
+  })),
+
+  awardTony: (showId) => set((s) => ({
+    campaign: {
+      ...s.campaign,
+      tonyWins: [...s.campaign.tonyWins, showId],
+    },
+    reputation: {
+      ...s.reputation,
+      score: Math.min(100, s.reputation.score + GAME_CONSTANTS.REPUTATION.TONY_WIN_REP),
+    },
+  })),
 }));
