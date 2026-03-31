@@ -1,14 +1,5 @@
-// End of run summary modal: shown when a show closes
+// End of run summary modal: styled as a Broadway playbill
 import { useGameStore } from '../../store/gameStore';
-
-function getStarRating(summary: { profit: number; averageAttendancePercent: number; totalPerformances: number }): number {
-  let stars = 1;
-  if (summary.averageAttendancePercent > 40) stars++;
-  if (summary.averageAttendancePercent > 65) stars++;
-  if (summary.profit > 0) stars++;
-  if (summary.profit > 50000 && summary.totalPerformances > 10) stars++;
-  return Math.min(5, stars);
-}
 
 function getCriticQuote(quality: number, showTitle: string): { quote: string; publication: string } {
   const publications = ['The New York Times', 'Broadway Beat', 'Theater Weekly', 'The Stage Review'];
@@ -40,12 +31,12 @@ function getCriticQuote(quality: number, showTitle: string): { quote: string; pu
 
 function StarDisplay({ count }: { count: number }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 justify-center">
       {Array.from({ length: 5 }, (_, i) => (
         <span
           key={i}
-          className={`text-lg ${i < count ? 'text-amber-400' : 'text-gray-700'}`}
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          className={`text-2xl ${i < count ? 'text-amber-400' : 'text-gray-700'}`}
+          style={{ fontFamily: 'Georgia, serif' }}
         >
           {i < count ? '\u2605' : '\u2606'}
         </span>
@@ -54,56 +45,73 @@ function StarDisplay({ count }: { count: number }) {
   );
 }
 
+function getStarRating(summary: { profit: number; averageAttendancePercent: number; totalPerformances: number }): number {
+  let stars = 1;
+  if (summary.averageAttendancePercent > 40) stars++;
+  if (summary.averageAttendancePercent > 65) stars++;
+  if (summary.profit > 0) stars++;
+  if (summary.profit > 50000 && summary.totalPerformances > 10) stars++;
+  return Math.min(5, stars);
+}
+
 export function EndOfRunModal() {
   const runSummary = useGameStore((s) => s.runSummary);
   const clearRunSummary = useGameStore((s) => s.clearRunSummary);
-  const events = useGameStore((s) => s.events);
+  const theaterName = useGameStore((s) => s.theaterName);
+  const activeShowId = useGameStore((s) => s.activeShowId);
+  const tonyNominations = useGameStore((s) => s.campaign.tonyNominations);
 
   if (!runSummary) return null;
 
   const isProfit = runSummary.profit >= 0;
   const stars = getStarRating(runSummary);
+  const isTonyNominated = activeShowId ? tonyNominations.includes(activeShowId) : false;
 
-  // Determine quality for critic quote — approximate from attendance + profit
+  // Determine quality for critic quote
   const estimatedQuality = Math.min(100, Math.round(
     runSummary.averageAttendancePercent * 0.6 + (runSummary.profit > 0 ? 30 : 10) + (stars * 2)
   ));
   const critic = getCriticQuote(estimatedQuality, runSummary.showTitle);
 
-  // Best moment: find the most positive resolved event
-  const resolvedEvents = events.filter((e) => e.resolved);
-  const bestEvent = resolvedEvents.length > 0
-    ? resolvedEvents.reduce((best, e) => {
-        const score = e.severity === 'minor' ? 1 : e.severity === 'moderate' ? 2 : 3;
-        const bestScore = best.severity === 'minor' ? 1 : best.severity === 'moderate' ? 2 : 3;
-        return score > bestScore ? e : best;
-      })
-    : null;
+  const handleNewProduction = () => {
+    useGameStore.getState().clearRunSummary();
+    useGameStore.getState().setPhase('production');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="w-[520px] bg-gray-950 border border-amber-900/40 rounded-xl shadow-2xl overflow-hidden end-of-run-enter">
-        {/* Header */}
-        <div className="p-6 bg-gradient-to-b from-amber-950/30 to-transparent border-b border-gray-800/30">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Final Curtain</p>
+      <div className="w-[480px] bg-gray-950 border-2 border-amber-800/60 rounded-sm shadow-2xl overflow-hidden end-of-run-enter">
+        {/* Playbill Header */}
+        <div className="bg-gradient-to-b from-amber-950/50 to-gray-950 border-b border-amber-800/40 py-8 px-6 text-center">
+          <p className="text-[10px] text-amber-600 uppercase tracking-[0.3em] mb-3">The Playbill</p>
           <h2
-            className="text-xl text-amber-200 font-bold"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+            className="text-3xl text-amber-100 mb-2"
+            style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}
           >
             {runSummary.showTitle}
           </h2>
-          <div className="flex items-center gap-3 mt-2">
-            <StarDisplay count={stars} />
-            <span className="text-xs text-gray-500">{runSummary.runDays} day run</span>
-          </div>
+          <p className="text-xs text-gray-400" style={{ fontFamily: 'Georgia, serif' }}>
+            Played at {theaterName || 'The Theater'}
+          </p>
+          <p className="text-[10px] text-gray-500 mt-1">
+            {runSummary.totalPerformances} performances over {runSummary.runDays} days
+          </p>
+
+          {isTonyNominated && (
+            <div className="inline-block mt-3 px-3 py-1 border border-amber-600 rounded-full bg-amber-900/30">
+              <span className="text-[10px] text-amber-300 uppercase tracking-wider font-bold">
+                Tony Nominated
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Critic Quote */}
-        <div className="px-6 pt-5 pb-3">
+        <div className="px-6 pt-5 pb-4">
           <blockquote className="border-l-2 border-amber-700/40 pl-4">
             <p
-              className="text-sm text-gray-300 italic leading-relaxed"
-              style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              className="text-sm text-gray-300 leading-relaxed"
+              style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}
             >
               {critic.quote}
             </p>
@@ -113,27 +121,29 @@ export function EndOfRunModal() {
           </blockquote>
         </div>
 
-        {/* Stats Grid */}
-        <div className="px-6 pb-4 grid grid-cols-2 gap-3">
-          <StatBox label="Performances" value={runSummary.totalPerformances.toString()} />
-          <StatBox
-            label="Avg. Attendance"
-            value={`${runSummary.averageAttendancePercent}%`}
-            color={runSummary.averageAttendancePercent > 60 ? 'text-emerald-400' : 'text-red-400'}
-          />
-          <StatBox
-            label="Total Revenue"
-            value={`$${runSummary.totalRevenue.toLocaleString()}`}
-            color="text-emerald-400"
-          />
-          <StatBox
-            label="Total Expenses"
-            value={`$${runSummary.totalExpenses.toLocaleString()}`}
-            color="text-red-400"
-          />
+        {/* Critic Score as Stars */}
+        <div className="px-6 pb-4 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Critic Score</p>
+          <StarDisplay count={stars} />
         </div>
 
-        {/* Profit line */}
+        {/* Revenue & Profit */}
+        <div className="px-6 pb-4 grid grid-cols-2 gap-3">
+          <div className="p-3 bg-gray-900/40 border border-gray-800/30 rounded-lg text-center">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total Revenue</p>
+            <p className="text-xl font-mono font-bold text-amber-400 mt-0.5">
+              ${runSummary.totalRevenue.toLocaleString()}
+            </p>
+          </div>
+          <div className="p-3 bg-gray-900/40 border border-gray-800/30 rounded-lg text-center">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total Expenses</p>
+            <p className="text-xl font-mono font-bold text-gray-400 mt-0.5">
+              ${runSummary.totalExpenses.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Profit/Loss */}
         <div className="px-6 pb-4">
           <div className={`text-center p-3 rounded-lg border ${
             isProfit
@@ -144,74 +154,47 @@ export function EndOfRunModal() {
               {isProfit ? 'Profit' : 'Loss'}
             </p>
             <p className={`text-2xl font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-              {isProfit ? '+' : ''}{runSummary.profit < 0 ? '-' : ''}${Math.abs(runSummary.profit).toLocaleString()}
+              {isProfit ? '+' : '-'}${Math.abs(runSummary.profit).toLocaleString()}
             </p>
           </div>
         </div>
 
-        {/* Best/Worst nights + Best Moment */}
-        <div className="px-6 pb-4 grid grid-cols-3 gap-2">
-          {runSummary.bestNight && (
-            <div className="p-2.5 bg-gray-900/40 border border-gray-800/30 rounded-lg">
-              <p className="text-[10px] text-gray-500 uppercase">Best Night</p>
-              <p className="text-xs text-emerald-400 font-mono mt-0.5">
-                ${runSummary.bestNight.revenue.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {runSummary.bestNight.attendance} attended
-              </p>
-            </div>
-          )}
-          {runSummary.worstNight && (
-            <div className="p-2.5 bg-gray-900/40 border border-gray-800/30 rounded-lg">
-              <p className="text-[10px] text-gray-500 uppercase">Worst Night</p>
-              <p className="text-xs text-red-400 font-mono mt-0.5">
-                ${runSummary.worstNight.revenue.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {runSummary.worstNight.attendance} attended
-              </p>
-            </div>
-          )}
-          {bestEvent && (
-            <div className="p-2.5 bg-gray-900/40 border border-gray-800/30 rounded-lg">
-              <p className="text-[10px] text-gray-500 uppercase">Best Moment</p>
-              <p className="text-xs text-amber-300 mt-0.5 leading-tight">
-                {bestEvent.title}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Reputation */}
-        <div className="px-6 pb-4">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">Reputation Change</span>
-            <span className={runSummary.reputationChange >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+        {/* Attendance & Reputation */}
+        <div className="px-6 pb-4 grid grid-cols-2 gap-3">
+          <div className="p-2.5 bg-gray-900/40 border border-gray-800/30 rounded-lg text-center">
+            <p className="text-[10px] text-gray-500 uppercase">Avg. Attendance</p>
+            <p className={`text-lg font-mono font-bold mt-0.5 ${
+              runSummary.averageAttendancePercent > 60 ? 'text-emerald-400' : 'text-red-400'
+            }`}>
+              {runSummary.averageAttendancePercent}%
+            </p>
+          </div>
+          <div className="p-2.5 bg-gray-900/40 border border-gray-800/30 rounded-lg text-center">
+            <p className="text-[10px] text-gray-500 uppercase">Reputation</p>
+            <p className={`text-lg font-mono font-bold mt-0.5 ${
+              runSummary.reputationChange >= 0 ? 'text-emerald-400' : 'text-red-400'
+            }`}>
               {runSummary.reputationChange >= 0 ? '+' : ''}{runSummary.reputationChange}
-            </span>
+            </p>
           </div>
         </div>
 
-        {/* Action */}
-        <div className="p-6 border-t border-gray-800/30">
+        {/* Actions */}
+        <div className="p-6 border-t border-gray-800/30 flex gap-3">
           <button
             onClick={clearRunSummary}
-            className="w-full py-3 px-4 bg-gradient-to-r from-amber-900/60 to-amber-800/40 border border-amber-700/50 rounded-lg text-amber-200 text-sm font-medium hover:from-amber-900/80 hover:to-amber-800/60 transition-all cursor-pointer"
+            className="flex-1 py-3 px-4 bg-gray-800/60 border border-gray-700/50 rounded-lg text-gray-300 text-sm font-medium hover:bg-gray-800 transition-all cursor-pointer"
           >
-            Back to Building
+            Return to Building
+          </button>
+          <button
+            onClick={handleNewProduction}
+            className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-900/60 to-amber-800/40 border border-amber-700/50 rounded-lg text-amber-200 text-sm font-medium hover:from-amber-900/80 hover:to-amber-800/60 transition-all cursor-pointer"
+          >
+            Start New Production
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="p-3 bg-gray-900/40 border border-gray-800/30 rounded-lg">
-      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-      <p className={`text-lg font-mono font-bold mt-0.5 ${color ?? 'text-gray-200'}`}>{value}</p>
     </div>
   );
 }
