@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 export interface Toast {
   id: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'money';
+  type: 'info' | 'success' | 'warning' | 'error' | 'money' | 'rival' | 'trend' | 'danger' | 'achievement';
 }
 
 const TOAST_DURATION = 3000; // ms
@@ -67,20 +67,26 @@ export function NotificationToast() {
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
       {toasts.map((toast) => {
-        const colorClasses = {
-          info: 'bg-gray-900/95 border-gray-700/50 text-gray-200',
-          success: 'bg-emerald-950/95 border-emerald-800/50 text-emerald-200',
-          warning: 'bg-amber-950/95 border-amber-800/50 text-amber-200',
-          error: 'bg-red-950/95 border-red-800/50 text-red-200',
-          money: 'bg-emerald-950/95 border-emerald-700/50 text-emerald-300',
+        const TYPE_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+          info: { bg: 'bg-blue-900/80', border: 'border-blue-700/40', text: 'text-blue-200' },
+          money: { bg: 'bg-amber-900/80', border: 'border-amber-600/40', text: 'text-amber-200' },
+          rival: { bg: 'bg-purple-900/80', border: 'border-purple-600/40', text: 'text-purple-200' },
+          trend: { bg: 'bg-orange-900/80', border: 'border-orange-600/40', text: 'text-orange-200' },
+          danger: { bg: 'bg-red-900/80', border: 'border-red-600/40', text: 'text-red-200' },
+          achievement: { bg: 'bg-yellow-900/80', border: 'border-yellow-500/40', text: 'text-yellow-200' },
+          warning: { bg: 'bg-amber-900/80', border: 'border-amber-600/40', text: 'text-amber-200' },
+          success: { bg: 'bg-emerald-900/80', border: 'border-emerald-600/40', text: 'text-emerald-200' },
+          error: { bg: 'bg-red-900/80', border: 'border-red-600/40', text: 'text-red-200' },
         };
+
+        const style = TYPE_STYLES[toast.type] || TYPE_STYLES.info;
 
         return (
           <div
             key={toast.id}
             className={`pointer-events-auto px-4 py-2.5 rounded-lg border backdrop-blur-sm shadow-xl
               text-sm font-medium animate-[slideIn_0.2s_ease-out]
-              ${colorClasses[toast.type]}
+              ${style.bg} ${style.border} ${style.text}
             `}
             onClick={() => dismiss(toast.id)}
             style={{ cursor: 'pointer' }}

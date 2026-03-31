@@ -60,7 +60,7 @@ export function tickRivals(): void {
           cash: rival.cash - budget,
         });
 
-        pushToast(`${rival.name} announces "${newShow.title}"`, 'info');
+        pushToast(`${rival.name} announces "${newShow.title}"`, 'rival');
       }
     }
 
@@ -83,7 +83,7 @@ export function tickRivals(): void {
           reputation: Math.min(90, rival.reputation + (showQuality > 60 ? 3 : -2)),
         });
 
-        pushToast(`${rival.name}'s "${closedShow.title}" closes after ${runDays} performances`, 'info');
+        pushToast(`${rival.name}'s "${closedShow.title}" closes after ${runDays} performances`, 'rival');
       } else {
         const attendance = Math.round(
           Math.min(100, showQuality * 0.5 + rival.buzz * 0.3 + Math.random() * 15),
@@ -117,7 +117,7 @@ export function checkRivalActivation(): void {
   for (const rival of rivals) {
     if (!rival.active && rival.appearsAtAct <= campaign.act) {
       state.activateRival(rival.id);
-      pushToast(`A new competitor has arrived: ${rival.name}`, 'info');
+      pushToast(`A new competitor has arrived: ${rival.name}`, 'rival');
     }
   }
 }
@@ -129,6 +129,6 @@ export function attemptPoach(firedCrewName: string, firedRole: string): void {
 
   if (Math.random() < 0.3) {
     const rival = activeRivals[Math.floor(Math.random() * activeRivals.length)];
-    pushToast(`${rival.name} just hired ${firedCrewName} as their ${firedRole}`, 'info');
+    pushToast(`${rival.name} just hired ${firedCrewName} as their ${firedRole}`, 'rival');
   }
 }

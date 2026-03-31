@@ -12,6 +12,7 @@ import { EventModal } from './ui/modals/EventModal';
 import { EndOfRunModal } from './ui/modals/EndOfRunModal';
 import { OpeningNightModal } from './ui/modals/OpeningNightModal';
 import { SaveLoadModal } from './ui/modals/SaveLoadModal';
+import { GameOverModal } from './ui/modals/GameOverModal';
 import { RunDashboard } from './ui/panels/RunDashboard';
 import { MoneyDisplay } from './ui/components/MoneyDisplay';
 import { NotificationToast } from './ui/components/NotificationToast';
@@ -601,6 +602,7 @@ function App() {
         <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
+        <GameOverModal />
         <NotificationToast />
       </div>
     );

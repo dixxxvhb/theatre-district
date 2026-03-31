@@ -357,7 +357,7 @@ export class GameLoop {
       updatedCampaign.act >= GAME_CONSTANTS.CAMPAIGN.TONY_MIN_ACT
     ) {
       state.nominateForTony(activeShow.id);
-      pushToast(`"${activeShow.title}" earns a Tony nomination!`, 'info');
+      pushToast(`"${activeShow.title}" earns a Tony nomination!`, 'achievement');
     }
 
     // Trend advancement
@@ -367,7 +367,7 @@ export class GameLoop {
         if (updatedCampaign.nextTrend) {
           state.setTrend(updatedCampaign.nextTrend);
           state.setNextTrend(null);
-          pushToast(`${updatedCampaign.nextTrend.trend.name} takes hold`, 'info');
+          pushToast(`${updatedCampaign.nextTrend.trend.name} takes hold`, 'trend');
         } else {
           state.setTrend(null);
         }
@@ -382,10 +382,10 @@ export class GameLoop {
       const nextTrend = pickRandomTrend(excludeId);
       const duration = rollTrendDuration(nextTrend);
       state.setNextTrend({ trend: nextTrend, showsRemaining: duration });
-      pushToast(`Word on the street: ${nextTrend.description}`, 'info');
+      pushToast(`Word on the street: ${nextTrend.description}`, 'trend');
     }
 
-    pushToast(`Show closed: ${_reason}`, 'warning');
+    pushToast(`Show closed: ${_reason}`, 'danger');
 
     state.closeShow(activeShow.id, {
       showTitle: activeShow.title,
