@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, GamePhase, ViewMode, RoomType, Position, Size, SpeedSetting, GridCell, Show, CrewMember, CastMember, MarketingCampaignState, PerformanceResult, RehearsalLogEntry, RunSummary, EventEffect, RivalTheater, CampaignState, ActiveTrend } from '../types';
+import type { GameState, GamePhase, ViewMode, RoomType, Position, Size, SpeedSetting, GridCell, Show, CrewMember, CastMember, MarketingCampaignState, PerformanceResult, RehearsalLogEntry, RunSummary, EventEffect, RivalTheater, ActiveTrend } from '../types';
 import { GAME_CONSTANTS } from '../game/data/constants';
 import { ROOM_DEFINITIONS } from '../game/data/rooms';
 import { canPlaceRoom, placeRoomOnGrid, removeRoomFromGrid } from '../game/systems/BuildingSystem';

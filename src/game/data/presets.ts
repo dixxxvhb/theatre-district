@@ -1,4 +1,4 @@
-import type { RoomPreset, RoomType } from '../../types';
+import type { RoomPreset } from '../../types';
 
 export const ROOM_PRESETS: RoomPreset[] = [
   // ---- Lobby ----
