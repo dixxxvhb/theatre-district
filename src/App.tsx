@@ -623,6 +623,7 @@ function App() {
         </div>
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
+        <GameOverModal />
         <NotificationToast />
       </div>
     );
@@ -641,6 +642,7 @@ function App() {
           <ShowPickerModal />
           {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
           {showTransition && <PhaseTransitionOverlay />}
+          <GameOverModal />
           <NotificationToast />
         </div>
       );
@@ -660,6 +662,7 @@ function App() {
         <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
+        <GameOverModal />
         <NotificationToast />
       </div>
     );
@@ -678,6 +681,7 @@ function App() {
         <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
+        <GameOverModal />
         <NotificationToast />
       </div>
     );
@@ -700,6 +704,7 @@ function App() {
         <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
+        <GameOverModal />
         <NotificationToast />
       </div>
     );
@@ -722,6 +727,7 @@ function App() {
         <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
+        <GameOverModal />
         <NotificationToast />
       </div>
     );
@@ -738,6 +744,7 @@ function App() {
       </div>
       {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
       {showTransition && <PhaseTransitionOverlay />}
+      <GameOverModal />
       <NotificationToast />
     </div>
   );
