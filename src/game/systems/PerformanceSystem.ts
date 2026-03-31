@@ -2,6 +2,8 @@
 import type { Show, CastMember, CrewMember, Room, Property, PerformanceResult } from '../../types';
 import { getDayOfWeek, isPerformanceDay } from '../engine/TimeManager';
 import { GAME_CONSTANTS } from '../data/constants';
+import { calculateBuzzShare } from './RivalSystem';
+import { useGameStore } from '../../store/gameStore';
 
 const DAY_OF_WEEK_MODIFIERS: Record<string, number> = {
   Mon: 0,    // dark day — no performance
@@ -49,6 +51,23 @@ interface PerformanceInput {
   runDay: number;       // days since opening
 }
 
+/** Get attendance multiplier from current trend for a show genre */
+function getTrendAttendanceMultiplier(genre: string): number {
+  const state = useGameStore.getState();
+  const activeTrend = state.campaign.currentTrend;
+  if (!activeTrend) return 1;
+
+  let multiplier = 1;
+  for (const effect of activeTrend.trend.effects) {
+    if (effect.type === 'attendance') {
+      if (!effect.genre || effect.genre === genre) {
+        multiplier *= effect.multiplier;
+      }
+    }
+  }
+  return multiplier;
+}
+
 /**
  * Calculate a single night's performance.
  * Returns null on dark days (Monday).
@@ -81,10 +100,16 @@ export function calculatePerformance(input: PerformanceInput): PerformanceResult
   // Run length decay — audiences thin out over time
   const runLengthDecay = Math.max(0.5, 1.0 - (runDay / 200));
 
+  // Rival buzz share — reduces attendance when rivals have more buzz
+  const buzzShareMultiplier = calculateBuzzShare();
+
+  // Trend modifier
+  const trendMultiplier = getTrendAttendanceMultiplier(show.genre);
+
   // Final attendance
   const attendance = Math.min(
     maxSeats,
-    Math.floor(baseAttendance * locationMod * dayOfWeekMod * runLengthDecay),
+    Math.floor(baseAttendance * locationMod * dayOfWeekMod * runLengthDecay * buzzShareMultiplier * trendMultiplier),
   );
 
   // Revenue
