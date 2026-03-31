@@ -187,6 +187,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const setViewMode = useGameStore((s) => s.setViewMode);
   const setSpeed = useGameStore((s) => s.setSpeed);
   const togglePause = useGameStore((s) => s.togglePause);
+  const isRenovating = useGameStore((s) => s.ui.isRenovating);
 
   const dateStr = getFormattedDate(day);
   const phaseLabel = PHASE_LABELS[currentPhase] ?? currentPhase;
@@ -235,6 +236,19 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             );
           })}
         </div>
+
+        {currentPhase !== 'menu' && currentPhase !== 'property_select' && currentPhase !== 'building' && (
+          <button
+            onClick={() => useGameStore.getState().toggleRenovate()}
+            className={`px-3 py-1 text-xs rounded border transition-colors cursor-pointer ${
+              isRenovating
+                ? 'bg-amber-900/60 border-amber-600 text-amber-300'
+                : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
+            }`}
+          >
+            Renovate
+          </button>
+        )}
 
         <div className="flex items-center gap-4">
           <MoneyDisplay />
@@ -415,6 +429,7 @@ function App() {
   const events = useGameStore((s) => s.events);
   const initialized = useGameStore((s) => s.initialized);
   const isPaused = useGameStore((s) => s.time.isPaused);
+  const isRenovating = useGameStore((s) => s.ui.isRenovating);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
   const prevPhaseRef = useRef(currentPhase);
   const [showTransition, setShowTransition] = useState(false);
@@ -465,6 +480,9 @@ function App() {
         case 'Escape':
           if (showSaveLoad) {
             setShowSaveLoad(false);
+          } else if (state.ui.isRenovating) {
+            state.toggleRenovate();
+            break;
           } else if (state.ui.selectedRoomType) {
             state.selectRoomType(null);
           } else if (state.initialized && state.ui.currentPhase !== 'menu') {
@@ -487,6 +505,13 @@ function App() {
           break;
         case '3':
           if (state.initialized) state.setSpeed('ultra');
+          break;
+
+        case 'r':
+        case 'R':
+          if (state.initialized && state.ui.currentPhase !== 'menu' && state.ui.currentPhase !== 'property_select' && state.ui.currentPhase !== 'building') {
+            state.toggleRenovate();
+          }
           break;
 
         case 'v':
@@ -605,6 +630,24 @@ function App() {
           </div>
           <StaffPanel />
         </div>
+        {isRenovating && (
+          <div className="absolute inset-0 z-40 flex">
+            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
+            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b border-gray-800">
+                <span className="text-sm font-bold text-amber-300">Renovate</span>
+                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
+                <button
+                  onClick={() => useGameStore.getState().toggleRenovate()}
+                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <BuildPanel />
+            </div>
+          </div>
+        )}
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -622,6 +665,24 @@ function App() {
           <GameCanvas />
         </div>
         <AuditionModal />
+        {isRenovating && (
+          <div className="absolute inset-0 z-40 flex">
+            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
+            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b border-gray-800">
+                <span className="text-sm font-bold text-amber-300">Renovate</span>
+                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
+                <button
+                  onClick={() => useGameStore.getState().toggleRenovate()}
+                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <BuildPanel />
+            </div>
+          </div>
+        )}
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -644,6 +705,24 @@ function App() {
           <MarketingPanel />
         </div>
         <OpeningNightModal />
+        {isRenovating && (
+          <div className="absolute inset-0 z-40 flex">
+            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
+            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b border-gray-800">
+                <span className="text-sm font-bold text-amber-300">Renovate</span>
+                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
+                <button
+                  onClick={() => useGameStore.getState().toggleRenovate()}
+                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <BuildPanel />
+            </div>
+          </div>
+        )}
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />
@@ -665,6 +744,24 @@ function App() {
           <RunDashboard />
         </div>
         {hasUnresolvedEvent && <EventModal />}
+        {isRenovating && (
+          <div className="absolute inset-0 z-40 flex">
+            <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
+            <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b border-gray-800">
+                <span className="text-sm font-bold text-amber-300">Renovate</span>
+                <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
+                <button
+                  onClick={() => useGameStore.getState().toggleRenovate()}
+                  className="text-gray-500 hover:text-white text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <BuildPanel />
+            </div>
+          </div>
+        )}
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <NotificationToast />

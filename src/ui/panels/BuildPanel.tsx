@@ -14,6 +14,7 @@ export function BuildPanel() {
   const properties = useGameStore((s) => s.properties);
   const activePropertyId = useGameStore((s) => s.activePropertyId);
   const cash = useGameStore((s) => s.economy.cash);
+  const isRenovating = useGameStore((s) => s.ui.isRenovating);
 
   const activeProperty = properties.find((p) => p.id === activePropertyId);
   const costModifier = activeProperty?.constructionCostModifier ?? 1;
@@ -59,10 +60,10 @@ export function BuildPanel() {
             color: '#d4a574',
           }}
         >
-          Build Mode
+          {isRenovating ? 'Renovate' : 'Build Mode'}
         </h2>
         <p className="text-gray-500 text-xs mt-1">
-          Click to place, or drag to resize
+          {isRenovating ? 'Rush pricing: 1.5x cost' : 'Click to place, or drag to resize'}
         </p>
       </div>
 
@@ -109,7 +110,8 @@ export function BuildPanel() {
       {/* Room list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {ROOM_LIST.map((room) => {
-          const adjustedCost = Math.round(room.baseCost * costModifier);
+          const rushMultiplier = isRenovating ? 1.5 : 1;
+          const adjustedCost = Math.round(room.baseCost * costModifier * rushMultiplier);
           const canAfford = cash >= adjustedCost;
           const isSelected = selectedRoomType === room.type;
           const isRequired = REQUIRED_ROOMS.includes(room.type);
@@ -181,21 +183,23 @@ export function BuildPanel() {
           </>
         )}
 
-        <button
-          onClick={handleDoneBuilding}
-          disabled={!mvtComplete}
-          className={`w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer border ${
-            mvtComplete
-              ? 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200 hover:bg-emerald-900/60'
-              : 'bg-gray-900/40 border-gray-800/40 text-gray-600 cursor-not-allowed'
-          }`}
-        >
-          {mvtComplete
-            ? 'Done Building →'
-            : mvtPlaced
-              ? 'Finish Construction First'
-              : 'Build Required Rooms'}
-        </button>
+        {!isRenovating && (
+          <button
+            onClick={handleDoneBuilding}
+            disabled={!mvtComplete}
+            className={`w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer border ${
+              mvtComplete
+                ? 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200 hover:bg-emerald-900/60'
+                : 'bg-gray-900/40 border-gray-800/40 text-gray-600 cursor-not-allowed'
+            }`}
+          >
+            {mvtComplete
+              ? 'Done Building →'
+              : mvtPlaced
+                ? 'Finish Construction First'
+                : 'Build Required Rooms'}
+          </button>
+        )}
       </div>
     </div>
   );
