@@ -6,11 +6,17 @@ import { FloorPlanRenderer } from '../rendering/FloorPlanRenderer';
 import { IsometricRenderer } from '../rendering/IsometricRenderer';
 import { GameLoop } from '../engine/GameLoop';
 import { screenToGrid } from '../../utils/isometric';
-import { TILE } from '../data/constants';
+import { TILE, USE_RENDER2 } from '../data/constants';
 import { ROOM_DEFINITIONS } from '../data/rooms';
 import { canPlaceRoom } from '../systems/BuildingSystem';
+import { Render2Canvas } from './Render2Canvas';
 
 export function GameCanvas() {
+  if (USE_RENDER2) return <Render2Canvas />;
+  return <LegacyGameCanvas />;
+}
+
+function LegacyGameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PixiApp | null>(null);
   const cameraRef = useRef<CameraController>(new CameraController());

@@ -31,9 +31,9 @@ export const CAMERA = {
 } as const;
 
 export const TILE = {
-  ISO_WIDTH: 64,
-  ISO_HEIGHT: 32,
-  FLOOR_SIZE: 32,           // floor plan cell size in pixels
+  ISO_WIDTH: 128,           // Kenney isometric tile family base width (street layer)
+  ISO_HEIGHT: 64,           // Kenney isometric tile family base height (street layer)
+  FLOOR_SIZE: 32,           // legacy floor-plan cell size — unchanged for legacy renderer
   GRID_LINE_COLOR: 0x2a2a4e,
   GRID_LINE_WIDTH: 1,
   HOVER_ALPHA: 0.3,
@@ -41,6 +41,10 @@ export const TILE = {
   SELECTED_COLOR: 0xd4a574,
   SELECTED_ALPHA: 0.5,
 } as const;
+
+// Feature flag for the new sprite-based iso street renderer.
+// Set VITE_USE_RENDER2=true in .env.local to switch. Page reload required.
+export const USE_RENDER2 = import.meta.env.VITE_USE_RENDER2 === 'true';
 
 export const GAME_CONSTANTS = {
   // Time
