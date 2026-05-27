@@ -71,6 +71,7 @@ const initialState: GameState = {
     isRenovating: false,
     streetTool: null,
     streetSelectedId: null,
+    showBuzzOverlay: false,
   },
 
   properties: [],

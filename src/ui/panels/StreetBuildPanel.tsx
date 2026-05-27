@@ -21,6 +21,8 @@ export function StreetBuildPanel() {
   const removeBuilding = useGameStore((s) => s.removeBuilding);
   const removeDecoration = useGameStore((s) => s.removeDecoration);
   const selectStreetEntity = useGameStore((s) => s.selectStreetEntity);
+  const showBuzzOverlay = useGameStore((s) => s.ui.showBuzzOverlay);
+  const toggleBuzzOverlay = useGameStore((s) => s.toggleBuzzOverlay);
 
   const plotCost = plotAcquisitionCost(street.plots.length);
   const selectedBuilding = streetSelectedId
@@ -136,6 +138,25 @@ export function StreetBuildPanel() {
           price={`$${plotCost.toLocaleString()}`}
           hint="Buy an adjacent tile to extend your street."
         />
+      </Section>
+
+      {/* View toggles */}
+      <Section title="View">
+        <button
+          onClick={toggleBuzzOverlay}
+          className={`w-full text-left px-3 py-2 rounded transition-colors ${
+            showBuzzOverlay
+              ? 'bg-amber-900/40 ring-1 ring-amber-600/60 text-amber-100'
+              : 'hover:bg-stone-800/60 text-stone-200'
+          }`}
+          title="Show the buzz heat-map overlay. Gold = high buzz, dark wash = negative (litter)."
+        >
+          <div className="flex items-baseline justify-between">
+            <span className="font-medium">Buzz Heat-Map</span>
+            <span className="text-xs text-stone-400">{showBuzzOverlay ? 'on' : 'off'}</span>
+          </div>
+          <div className="text-xs text-stone-400 mt-0.5">Gold = high, dark = low</div>
+        </button>
       </Section>
     </div>
   );

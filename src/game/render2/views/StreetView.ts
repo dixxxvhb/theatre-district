@@ -15,6 +15,7 @@ import { LAYER } from '../depth';
 import { TileLayer, type GridBounds } from '../tiles/TileLayer';
 import { BuildingSprite } from '../entities/BuildingSprite';
 import { DecorationSprite } from '../entities/DecorationSprite';
+import { BuzzOverlay } from './BuzzOverlay';
 
 export interface StreetViewInputs {
   bounds: GridBounds;
@@ -24,6 +25,10 @@ export interface StreetViewInputs {
   hoveredTile: { x: number; y: number } | null;
   selectedTile: { x: number; y: number } | null;
   ghost: GhostState | null;
+  buzzField: Float32Array;
+  buzzFieldWidth: number;
+  buzzFieldHeight: number;
+  showBuzzOverlay: boolean;
 }
 
 export interface GhostState {
@@ -35,6 +40,7 @@ export interface GhostState {
 export class StreetView {
   readonly container = new Container();
   readonly tileLayer: TileLayer;
+  readonly buzzOverlay: BuzzOverlay;
   private buildingSprites = new Map<string, BuildingSprite>();
   private decorationSprites = new Map<string, DecorationSprite>();
   private ghostGraphics = new Graphics();
@@ -44,8 +50,10 @@ export class StreetView {
     this.container.sortableChildren = true;
     this.tileLayer = new TileLayer();
     this.container.addChild(this.tileLayer.container);
+    this.buzzOverlay = new BuzzOverlay();
+    this.container.addChild(this.buzzOverlay.container);
 
-    this.ghostGraphics.zIndex = LAYER.UI_OVERLAY;
+    this.ghostGraphics.zIndex = LAYER.UI_OVERLAY + 5; // above buzz overlay
     this.container.addChild(this.ghostGraphics);
   }
 
@@ -54,7 +62,15 @@ export class StreetView {
     this.updateHover(inputs);
     this.updateBuildings(inputs.buildings);
     this.updateDecoration(inputs.decoration);
+    this.updateBuzzOverlay(inputs);
     this.drawGhost(inputs.ghost);
+  }
+
+  private updateBuzzOverlay(inputs: StreetViewInputs): void {
+    this.buzzOverlay.setVisible(inputs.showBuzzOverlay);
+    if (inputs.showBuzzOverlay) {
+      this.buzzOverlay.draw(inputs.bounds, inputs.buzzField, inputs.buzzFieldWidth, inputs.buzzFieldHeight);
+    }
   }
 
   /** Update only the ghost (called per-tick from the engine ticker). */
@@ -148,6 +164,7 @@ export class StreetView {
     this.buildingSprites.clear();
     this.decorationSprites.clear();
     this.ghostGraphics.destroy();
+    this.buzzOverlay.destroy();
     this.container.destroy();
   }
 }

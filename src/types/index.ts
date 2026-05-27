@@ -302,6 +302,8 @@ export interface UIState {
   streetTool: StreetTool | null;
   /** Theatre District: currently selected placed building/decoration id. */
   streetSelectedId: string | null;
+  /** Theatre District: show the buzz heat-map overlay. */
+  showBuzzOverlay: boolean;
 }
 
 export interface Notification {

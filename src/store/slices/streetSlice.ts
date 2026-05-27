@@ -29,6 +29,7 @@ import {
   DECORATION_DEFINITIONS,
   plotAcquisitionCost,
 } from '../../game/data/street';
+import { computeBuzz } from '../../game/systems/BuzzSystem';
 
 const STARTING_BOUNDS: StreetBounds = { minX: 0, maxX: 7, minY: 0, maxY: 2 };
 
@@ -87,6 +88,9 @@ export interface StreetSlice {
 
   /** Select a placed building or decoration by id. Null to deselect. */
   selectStreetEntity: (id: string | null) => void;
+
+  /** Toggle the buzz heat-map overlay. */
+  toggleBuzzOverlay: () => void;
 }
 
 /** State keys this slice owns. Concatenated into the root persist-keys array. */
@@ -151,6 +155,15 @@ function newId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+/**
+ * Build a new street object with buzz field recomputed from sources.
+ * Locked-spec recompute trigger: every placement / removal / litter / bounds change.
+ * Buzz is event-driven, never per-frame.
+ */
+function withRecomputedBuzz(next: StreetState): StreetState {
+  return { ...next, buzzField: computeBuzz(next) };
+}
+
 // ============================================================
 // Slice
 // ============================================================
@@ -181,27 +194,17 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
       };
       const newWidth = newBounds.maxX - newBounds.minX + 1;
       const newHeight = newBounds.maxY - newBounds.minY + 1;
-      // Resize buzz field — preserve existing values in the new index space
-      const newBuzz = new Float32Array(newWidth * newHeight);
-      const oldB = state.street.bounds;
-      const oldW = state.street.buzzFieldWidth;
-      for (let oy = oldB.minY; oy <= oldB.maxY; oy++) {
-        for (let ox = oldB.minX; ox <= oldB.maxX; ox++) {
-          const oldIdx = (ox - oldB.minX) + (oy - oldB.minY) * oldW;
-          const newIdx = (ox - newBounds.minX) + (oy - newBounds.minY) * newWidth;
-          newBuzz[newIdx] = state.street.buzzField[oldIdx] ?? 0;
-        }
-      }
-      return {
-        street: {
-          ...state.street,
-          plots: newPlots,
-          bounds: newBounds,
-          buzzField: newBuzz,
-          buzzFieldWidth: newWidth,
-          buzzFieldHeight: newHeight,
-        },
+      // Buzz field is recomputed from sources below — sizing it correctly is
+      // all withRecomputedBuzz needs. No need to preserve old values.
+      const resized: StreetState = {
+        ...state.street,
+        plots: newPlots,
+        bounds: newBounds,
+        buzzField: new Float32Array(newWidth * newHeight),
+        buzzFieldWidth: newWidth,
+        buzzFieldHeight: newHeight,
       };
+      return { street: withRecomputedBuzz(resized) };
     });
     return { ok: true };
   },
@@ -234,7 +237,7 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
     }
     s.removeCash(def.cost, 'construction', `Built ${def.label}`);
     set((state) => ({
-      street: {
+      street: withRecomputedBuzz({
         ...state.street,
         placedBuildings: [
           ...state.street.placedBuildings,
@@ -247,7 +250,7 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
             constructionDaysLeft: def.buildDays,
           },
         ],
-      },
+      }),
     }));
     return { ok: true };
   },
@@ -272,7 +275,7 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
     }
     s.removeCash(def.cost, 'decoration', `Placed ${def.label}`);
     set((state) => ({
-      street: {
+      street: withRecomputedBuzz({
         ...state.street,
         decoration: [
           ...state.street.decoration,
@@ -283,26 +286,26 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
             placedDay: currentDay,
           },
         ],
-      },
+      }),
     }));
     return { ok: true };
   },
 
   removeBuilding: (id) => {
     set((state) => ({
-      street: {
+      street: withRecomputedBuzz({
         ...state.street,
         placedBuildings: state.street.placedBuildings.filter((b) => b.id !== id),
-      },
+      }),
     }));
   },
 
   removeDecoration: (id) => {
     set((state) => ({
-      street: {
+      street: withRecomputedBuzz({
         ...state.street,
         decoration: state.street.decoration.filter((d) => d.id !== id),
-      },
+      }),
     }));
   },
 
@@ -314,5 +317,9 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
 
   selectStreetEntity: (id) => set((state) => ({
     ui: { ...state.ui, streetSelectedId: id, streetTool: null },
+  })),
+
+  toggleBuzzOverlay: () => set((state) => ({
+    ui: { ...state.ui, showBuzzOverlay: !state.ui.showBuzzOverlay },
   })),
 });
