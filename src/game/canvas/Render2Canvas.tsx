@@ -110,9 +110,10 @@ export function Render2Canvas() {
   }, []);
 
   // Re-paint scene on relevant state changes.
+  // dailyPhase is included so BuildingSprite's lit-window effect refreshes on transitions.
   useEffect(() => {
     paintAll();
-  }, [bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, plots, buildings, decoration, litter, selectedTile, buzzField, showBuzzOverlay]);
+  }, [bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, plots, buildings, decoration, litter, selectedTile, buzzField, showBuzzOverlay, dailyPhase]);
 
   // Recenter when bounds expand.
   useEffect(() => {

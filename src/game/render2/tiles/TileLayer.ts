@@ -43,12 +43,44 @@ export class TileLayer {
     for (let gy = bounds.minY; gy <= bounds.maxY; gy++) {
       for (let gx = bounds.minX; gx <= bounds.maxX; gx++) {
         const checker = (gx + gy) % 2 === 0;
-        const color = isOwned(gx, gy)
+        const owned = isOwned(gx, gy);
+        const color = owned
           ? (checker ? STREET_PALETTE.sidewalk : STREET_PALETTE.sidewalkAlt)
           : STREET_PALETTE.emptyLot;
         this.fillDiamond(this.graphics, gx, gy, color, 1);
         this.strokeDiamond(this.graphics, gx, gy, STREET_PALETTE.grid, 0.45, 1);
+        // Owned tiles get a subtle inner panel seam — reads as concrete slab edges
+        if (owned) {
+          this.drawSidewalkDetail(gx, gy);
+        }
       }
+    }
+  }
+
+  /** Inner panel seam + occasional sidewalk crack / manhole pattern. */
+  private drawSidewalkDetail(gx: number, gy: number): void {
+    const g = this.graphics;
+    const screen = gridToScreen(gx, gy);
+    const halfW = TILE.ISO_WIDTH / 2;
+    const halfH = TILE.ISO_HEIGHT / 2;
+    const cx = screen.x + halfW;
+    const cy = screen.y + halfH;
+    // Inner panel: smaller diamond inset 20% from edges
+    const inset = 0.78;
+    const ihW = halfW * inset;
+    const ihH = halfH * inset;
+    g.moveTo(cx, cy - ihH).lineTo(cx + ihW, cy).lineTo(cx, cy + ihH).lineTo(cx - ihW, cy).closePath();
+    g.stroke({ color: STREET_PALETTE.outline, alpha: 0.18, width: 1 });
+
+    // Deterministic "crack" on tiles where (gx*7 + gy*13) % 11 === 0
+    if (((gx * 7 + gy * 13) % 11) === 0) {
+      g.moveTo(cx - 30, cy - 5).lineTo(cx - 10, cy + 2).lineTo(cx + 6, cy - 4).lineTo(cx + 28, cy + 3);
+      g.stroke({ color: STREET_PALETTE.outline, alpha: 0.25, width: 1 });
+    }
+    // Manhole on tiles where (gx*5 + gy*9) % 17 === 0
+    if (((gx * 5 + gy * 9) % 17) === 0) {
+      g.ellipse(cx, cy, 12, 6).fill({ color: STREET_PALETTE.road, alpha: 0.6 });
+      g.ellipse(cx, cy, 12, 6).stroke({ color: STREET_PALETTE.outline, alpha: 0.5, width: 1 });
     }
   }
 

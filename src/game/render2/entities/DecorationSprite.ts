@@ -42,10 +42,13 @@ export class DecorationSprite {
 
     switch (kind) {
       case 'lamp':
-        // Pole + glow ball
-        g.rect(cx - 3, cy - 70, 6, 70).fill({ color: palette.primary });
-        g.circle(cx, cy - 80, 12).fill({ color: palette.accent });
-        g.circle(cx, cy - 80, 18).fill({ color: palette.accent, alpha: 0.3 });
+        // Cast-iron pole with decorative collar + glowing globe
+        g.rect(cx - 3, cy - 80, 6, 80).fill({ color: palette.primary });
+        g.rect(cx - 6, cy - 60, 12, 4).fill({ color: palette.primary });   // mid-shaft collar
+        g.rect(cx - 8, cy - 90, 16, 4).fill({ color: palette.primary });   // top bracket
+        g.circle(cx, cy - 95, 10).fill({ color: palette.accent });          // bulb
+        g.circle(cx, cy - 95, 18).fill({ color: palette.accent, alpha: 0.35 }); // halo inner
+        g.circle(cx, cy - 95, 26).fill({ color: palette.accent, alpha: 0.15 }); // halo outer
         break;
       case 'tree': {
         // Trunk + 3 stacked diamond canopy
@@ -60,14 +63,28 @@ export class DecorationSprite {
         break;
       }
       case 'fountain': {
-        // Basin (iso diamond) + spout
-        const bw = 70;
-        const bh = 35;
+        // Two-tier basin (lower iso diamond + upper smaller diamond) + spout + water shimmer
+        const bw = 80;
+        const bh = 40;
+        // Lower basin
         g.moveTo(cx, cy - bh / 2).lineTo(cx + bw / 2, cy).lineTo(cx, cy + bh / 2).lineTo(cx - bw / 2, cy).closePath();
         g.fill({ color: palette.primary });
         g.stroke({ color: PALETTE.ink, width: 1.5, alpha: 0.85 });
-        g.circle(cx, cy - 30, 6).fill({ color: palette.accent });
-        g.rect(cx - 2, cy - 28, 4, 28).fill({ color: palette.accent });
+        // Water sheen inside basin
+        g.moveTo(cx, cy - bh / 2 + 6).lineTo(cx + bw / 2 - 8, cy).lineTo(cx, cy + bh / 2 - 6).lineTo(cx - bw / 2 + 8, cy).closePath();
+        g.fill({ color: PALETTE.midnight, alpha: 0.55 });
+        // Upper smaller basin
+        const ubw = 40, ubh = 20;
+        g.moveTo(cx, cy - 24 - ubh / 2).lineTo(cx + ubw / 2, cy - 24).lineTo(cx, cy - 24 + ubh / 2).lineTo(cx - ubw / 2, cy - 24).closePath();
+        g.fill({ color: palette.primary });
+        g.stroke({ color: PALETTE.ink, width: 1, alpha: 0.85 });
+        // Central spout column + droplets
+        g.rect(cx - 2, cy - 50, 4, 28).fill({ color: palette.accent });
+        g.circle(cx, cy - 52, 4).fill({ color: palette.accent });
+        g.circle(cx - 8, cy - 38, 2).fill({ color: PALETTE.bone, alpha: 0.7 });
+        g.circle(cx + 8, cy - 36, 2).fill({ color: PALETTE.bone, alpha: 0.7 });
+        g.circle(cx - 4, cy - 30, 1.5).fill({ color: PALETTE.bone, alpha: 0.6 });
+        g.circle(cx + 4, cy - 30, 1.5).fill({ color: PALETTE.bone, alpha: 0.6 });
         break;
       }
       case 'bench': {
