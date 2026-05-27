@@ -14,22 +14,23 @@ export function RehearsalView() {
   const day = useGameStore((s) => s.time.day);
 
   const activeShow = shows.find((s) => s.id === activeShowId);
+  const lastDecisionDay = useGameStore((s) => s.lastDirectorDecisionDay);
+  const usedDecisionIds = useGameStore((s) => s.usedDirectorDecisionIds);
   const [activeDecision, setActiveDecision] = useState<DirectorDecision | null>(null);
-  const [usedDecisionIds, setUsedDecisionIds] = useState<string[]>([]);
-  const [lastDecisionDay, setLastDecisionDay] = useState(0);
 
   // Check for director decision trigger
   useEffect(() => {
     if (!activeShow?.isRehearsing) return;
+    if (activeDecision) return;
     const daysSinceLast = day - lastDecisionDay;
-    if (daysSinceLast >= 5 + Math.floor(Math.random() * 3) && !activeDecision) {
+    if (daysSinceLast >= 5 + Math.floor(Math.random() * 3)) {
       const decision = pickDecision(usedDecisionIds);
       if (decision) {
         setActiveDecision(decision);
         useGameStore.getState().setSpeed('paused');
       }
     }
-  }, [day]);
+  }, [day, activeShow?.isRehearsing, activeDecision, lastDecisionDay, usedDecisionIds]);
 
   const handleResolveDecision = (choice: 'a' | 'b') => {
     if (!activeDecision || !activeShow) return;
@@ -70,8 +71,7 @@ export function RehearsalView() {
     }
 
     pushToast(`Director chose: ${option.label}`, 'info');
-    setUsedDecisionIds([...usedDecisionIds, activeDecision.id]);
-    setLastDecisionDay(day);
+    useGameStore.getState().recordDirectorDecision(activeDecision.id, day);
     setActiveDecision(null);
     useGameStore.getState().setSpeed('normal');
   };

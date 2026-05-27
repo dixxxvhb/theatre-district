@@ -222,13 +222,27 @@ export class GameLoop {
       state.processPerformance(result);
       pushToast(`$${result.revenue.toLocaleString()} earned tonight`, 'money');
 
-      // Track low attendance streak
+      // Track low attendance streak (per-day)
       const capacity = getSeatingCapacity(activeProperty.rooms);
       const attendanceRatio = capacity > 0 ? result.attendance / capacity : 0;
       if (attendanceRatio < GAME_CONSTANTS.PERFORMANCE.CLOSING_ATTENDANCE_MIN) {
         state.setLowAttendanceStreak(state.lowAttendanceStreak + 1);
       } else {
         state.setLowAttendanceStreak(0);
+      }
+
+      // Weekly attendance roll-up — feeds the "outcompeted" loss condition.
+      if (newRunDay > 0 && newRunDay % 7 === 0) {
+        const refetched = useGameStore.getState();
+        const last7 = refetched.performanceHistory.slice(-7);
+        const weeklyAvg = last7.length > 0
+          ? last7.reduce((sum, p) => sum + (p.capacity > 0 ? p.attendance / p.capacity : 0), 0) / last7.length
+          : 0;
+        if (weeklyAvg < GAME_CONSTANTS.PERFORMANCE.CLOSING_ATTENDANCE_MIN) {
+          refetched.setLowAttendanceWeeks(refetched.campaign.lowAttendanceWeeks + 1);
+        } else {
+          refetched.setLowAttendanceWeeks(0);
+        }
       }
     }
 
@@ -388,6 +402,7 @@ export class GameLoop {
     pushToast(`Show closed: ${_reason}`, 'danger');
 
     state.closeShow(activeShow.id, {
+      showId: activeShow.id,
       showTitle: activeShow.title,
       totalPerformances: showPerfs.length,
       totalRevenue,

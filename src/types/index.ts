@@ -324,6 +324,7 @@ export interface RehearsalLogEntry {
 }
 
 export interface RunSummary {
+  showId: string;
   showTitle: string;
   totalPerformances: number;
   totalRevenue: number;
@@ -487,4 +488,9 @@ export interface GameState {
   lowAttendanceStreak: number;  // consecutive performance days below 30%
   runSummary: RunSummary | null;
   showOpeningNightModal: boolean;
+  pendingTonyShowId: string | null;
+
+  // Director-decision persistence (per-rehearsal)
+  lastDirectorDecisionDay: number;
+  usedDirectorDecisionIds: string[];
 }

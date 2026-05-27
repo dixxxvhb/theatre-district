@@ -13,6 +13,7 @@ import { EndOfRunModal } from './ui/modals/EndOfRunModal';
 import { OpeningNightModal } from './ui/modals/OpeningNightModal';
 import { SaveLoadModal } from './ui/modals/SaveLoadModal';
 import { GameOverModal } from './ui/modals/GameOverModal';
+import { TonyAwardsModal } from './ui/modals/TonyAwardsModal';
 import { RunDashboard } from './ui/panels/RunDashboard';
 import { MoneyDisplay } from './ui/components/MoneyDisplay';
 import { NotificationToast } from './ui/components/NotificationToast';
@@ -364,6 +365,27 @@ function PhaseTransitionOverlay() {
   return <div className="phase-transition" />;
 }
 
+function PendingTonyAwards() {
+  const pendingTonyShowId = useGameStore((s) => s.pendingTonyShowId);
+  const shows = useGameStore((s) => s.shows);
+  const clearPendingTonyShowId = useGameStore((s) => s.clearPendingTonyShowId);
+
+  if (!pendingTonyShowId) return null;
+  const show = shows.find((s) => s.id === pendingTonyShowId);
+  if (!show) {
+    clearPendingTonyShowId();
+    return null;
+  }
+
+  return (
+    <TonyAwardsModal
+      showId={pendingTonyShowId}
+      showTitle={show.title}
+      onClose={clearPendingTonyShowId}
+    />
+  );
+}
+
 function App() {
   const currentPhase = useGameStore((s) => s.ui.currentPhase);
   const activeShowId = useGameStore((s) => s.activeShowId);
@@ -513,6 +535,7 @@ function App() {
         <div className="flex-1 relative">
           <GameCanvas />
         </div>
+        <PendingTonyAwards />
         <EndOfRunModal />
         <RenovateOverlay />
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}

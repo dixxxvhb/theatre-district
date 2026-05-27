@@ -58,14 +58,16 @@ export function EndOfRunModal() {
   const runSummary = useGameStore((s) => s.runSummary);
   const clearRunSummary = useGameStore((s) => s.clearRunSummary);
   const theaterName = useGameStore((s) => s.theaterName);
-  const activeShowId = useGameStore((s) => s.activeShowId);
   const tonyNominations = useGameStore((s) => s.campaign.tonyNominations);
+  const pendingTonyShowId = useGameStore((s) => s.pendingTonyShowId);
 
   if (!runSummary) return null;
+  // Tony ceremony plays first; this modal waits behind it.
+  if (pendingTonyShowId) return null;
 
   const isProfit = runSummary.profit >= 0;
   const stars = getStarRating(runSummary);
-  const isTonyNominated = activeShowId ? tonyNominations.includes(activeShowId) : false;
+  const isTonyNominated = tonyNominations.includes(runSummary.showId);
 
   // Determine quality for critic quote
   const estimatedQuality = Math.min(100, Math.round(

@@ -86,6 +86,7 @@ export function RunDashboard() {
       : -5;
 
     closeShow(activeShow.id, {
+      showId: activeShow.id,
       showTitle: activeShow.title,
       totalPerformances: performanceHistory.length,
       totalRevenue,

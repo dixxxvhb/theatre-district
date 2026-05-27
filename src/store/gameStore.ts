@@ -72,6 +72,9 @@ const initialState: GameState = {
   lowAttendanceStreak: 0,
   runSummary: null,
   showOpeningNightModal: false,
+  pendingTonyShowId: null,
+  lastDirectorDecisionDay: 0,
+  usedDirectorDecisionIds: [],
 
   campaign: {
     act: 1,
@@ -176,6 +179,7 @@ interface GameActions {
   setTrend: (trend: ActiveTrend | null) => void;
   setNextTrend: (trend: ActiveTrend | null) => void;
   setGameOver: (reason: string) => void;
+  setLowAttendanceWeeks: (count: number) => void;
 
   // Rivals (v2.0)
   initRivals: () => void;
@@ -188,6 +192,9 @@ interface GameActions {
   // Tony (v2.0)
   nominateForTony: (showId: string) => void;
   awardTony: (showId: string) => void;
+  clearPendingTonyShowId: () => void;
+  recordDirectorDecision: (decisionId: string, atDay: number) => void;
+  resetDirectorDecisions: () => void;
 
   // Serialization
   getSerializableState: () => GameState;
@@ -482,6 +489,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     ui: { ...s.ui, currentPhase: 'rehearsal' as GamePhase },
     time: { ...s.time, isPaused: false, speed: 'normal' as SpeedSetting },
     rehearsalLog: [],
+    lastDirectorDecisionDay: s.time.day,
+    usedDirectorDecisionIds: [],
   })),
 
   addRehearsalLog: (entry: RehearsalLogEntry) => set((s) => ({
@@ -694,7 +703,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   getSerializableState: () => {
     const state = get();
     // Strip action functions, return only data
-    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, setShowOpeningNightModal, dismissOpeningNight, getSerializableState, loadState, toggleRenovate, advanceAct, checkLossConditions, incrementShowCount, setTrend, setNextTrend, setGameOver, initRivals, activateRival, updateRival, setRoomPreset, nominateForTony, awardTony, ...data } = state;
+    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, setShowOpeningNightModal, dismissOpeningNight, getSerializableState, loadState, toggleRenovate, advanceAct, checkLossConditions, incrementShowCount, setTrend, setNextTrend, setGameOver, setLowAttendanceWeeks, initRivals, activateRival, updateRival, setRoomPreset, nominateForTony, awardTony, clearPendingTonyShowId, recordDirectorDecision, resetDirectorDecisions, ...data } = state;
     return data as GameState;
   },
 
@@ -750,6 +759,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     campaign: { ...s.campaign, gameOver: true, gameOverReason: reason },
   })),
 
+  setLowAttendanceWeeks: (count) => set((s) => ({
+    campaign: { ...s.campaign, lowAttendanceWeeks: count },
+  })),
+
   // ---- Rivals (v2.0) ----
   initRivals: () => set({ rivals: createAllRivals() }),
 
@@ -785,6 +798,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       ...s.campaign,
       tonyNominations: [...s.campaign.tonyNominations, showId],
     },
+    pendingTonyShowId: showId,
   })),
 
   awardTony: (showId) => set((s) => ({
@@ -797,4 +811,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       score: Math.min(100, s.reputation.score + GAME_CONSTANTS.REPUTATION.TONY_WIN_REP),
     },
   })),
+
+  clearPendingTonyShowId: () => set({ pendingTonyShowId: null }),
+
+  recordDirectorDecision: (decisionId, atDay) => set((s) => ({
+    lastDirectorDecisionDay: atDay,
+    usedDirectorDecisionIds: [...s.usedDirectorDecisionIds, decisionId],
+  })),
+
+  resetDirectorDecisions: () => set({
+    lastDirectorDecisionDay: 0,
+    usedDirectorDecisionIds: [],
+  }),
 }));
