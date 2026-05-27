@@ -70,7 +70,8 @@ export function computeBuzz(street: StreetState): Float32Array {
     const base = BUILDING_BUZZ[b.kind];
     if (!base) continue;
     const popMult = b.kind === 'theatre' ? (b.popularity ?? 1.0) : 1.0;
-    spreadFrom(field, tileIndex, b.position.x, b.position.y, base * popMult, 1);
+    const tierMult = (b.tier ?? 1) === 2 ? 1.25 : 1.0;
+    spreadFrom(field, tileIndex, b.position.x, b.position.y, base * popMult * tierMult, 1);
   }
 
   // --- 2. Decoration: per-tile diminishing-returns pool ---

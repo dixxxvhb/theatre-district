@@ -73,6 +73,7 @@ const initialState: GameState = {
     streetSelectedId: null,
     showBuzzOverlay: false,
     theatreModalOpen: false,
+    sweeperHired: false,
   },
 
   properties: [],

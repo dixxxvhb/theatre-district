@@ -24,6 +24,10 @@ export function StreetBuildPanel() {
   const showBuzzOverlay = useGameStore((s) => s.ui.showBuzzOverlay);
   const toggleBuzzOverlay = useGameStore((s) => s.toggleBuzzOverlay);
   const openTheatreModal = useGameStore((s) => s.openTheatreModal);
+  const upgradeBuilding = useGameStore((s) => s.upgradeBuilding);
+  const sweeperHired = useGameStore((s) => s.ui.sweeperHired);
+  const toggleSweeper = useGameStore((s) => s.toggleSweeper);
+  const litterCount = useGameStore((s) => s.street.litter.length);
 
   const plotCost = plotAcquisitionCost(street.plots.length);
   const selectedBuilding = streetSelectedId
@@ -65,6 +69,18 @@ export function StreetBuildPanel() {
                 >
                   Enter Theatre
                 </button>
+              )}
+              {selectedBuilding.constructionDaysLeft === 0 && (selectedBuilding.tier ?? 1) === 1 && (
+                <button
+                  onClick={() => upgradeBuilding(selectedBuilding.id)}
+                  disabled={cash < upgradeCostFor(selectedBuilding.kind)}
+                  className="mt-2 w-full px-3 py-2 bg-emerald-900/40 hover:bg-emerald-900/60 border border-emerald-700/60 text-emerald-100 rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Upgrade (+25% buzz) · ${upgradeCostFor(selectedBuilding.kind).toLocaleString()}
+                </button>
+              )}
+              {(selectedBuilding.tier ?? 1) === 2 && (
+                <div className="mt-2 text-xs text-emerald-300">★ Upgraded</div>
               )}
               <button
                 onClick={() => { removeBuilding(selectedBuilding.id); selectStreetEntity(null); }}
@@ -149,6 +165,28 @@ export function StreetBuildPanel() {
         />
       </Section>
 
+      {/* Staff */}
+      <Section title="Staff">
+        <button
+          onClick={toggleSweeper}
+          className={`w-full text-left px-3 py-2 rounded transition-colors ${
+            sweeperHired
+              ? 'bg-emerald-900/40 ring-1 ring-emerald-600/60 text-emerald-100'
+              : 'hover:bg-stone-800/60 text-stone-200'
+          }`}
+          title="Hire a street sweeper. Clears 1 litter spot per day."
+        >
+          <div className="flex items-baseline justify-between">
+            <span className="font-medium">Sweeper</span>
+            <span className="text-xs font-mono text-emerald-400">$50/day</span>
+          </div>
+          <div className="text-xs text-stone-400 mt-0.5">
+            {sweeperHired ? 'hired · clears 1 litter/day' : 'unhired'}
+            {litterCount > 0 && ` · ${litterCount} litter spot${litterCount === 1 ? '' : 's'} now`}
+          </div>
+        </button>
+      </Section>
+
       {/* View toggles */}
       <Section title="View">
         <button
@@ -169,6 +207,16 @@ export function StreetBuildPanel() {
       </Section>
     </div>
   );
+}
+
+// Mirror of upgradeCost in streetSlice — kept here for UI display only.
+function upgradeCostFor(kind: string): number {
+  switch (kind) {
+    case 'theatre': return 40_000;
+    case 'restaurant': return 12_000;
+    case 'cart': return 2_500;
+    default: return 5_000;
+  }
 }
 
 function labelForTool(tool: StreetTool): string {

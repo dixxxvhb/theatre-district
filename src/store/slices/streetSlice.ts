@@ -102,6 +102,12 @@ export interface StreetSlice {
   /** Open / close the theatre modal for the currently selected theatre. */
   openTheatreModal: () => void;
   closeTheatreModal: () => void;
+
+  /** Upgrade a building from tier 1 → tier 2. Deducts cost. */
+  upgradeBuilding: (id: string) => PlacementResult;
+
+  /** Toggle the street sweeper hire. Daily cost ticked by TimeSystem. */
+  toggleSweeper: () => void;
 }
 
 /** State keys this slice owns. Concatenated into the root persist-keys array. */
@@ -363,4 +369,40 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
   closeTheatreModal: () => set((state) => ({
     ui: { ...state.ui, theatreModalOpen: false },
   })),
+
+  upgradeBuilding: (id) => {
+    const s = get();
+    const building = s.street.placedBuildings.find((b) => b.id === id);
+    if (!building) return { ok: false, reason: 'Not found' };
+    if ((building.tier ?? 1) >= 2) return { ok: false, reason: 'Already upgraded' };
+    if (building.constructionDaysLeft > 0) return { ok: false, reason: 'Finish construction first' };
+    const cost = upgradeCost(building.kind);
+    if (s.economy.cash < cost) return { ok: false, reason: 'Not enough cash' };
+    s.removeCash(cost, 'upgrade', `Upgraded ${building.kind}`);
+    set((state) => ({
+      street: withRecomputedBuzz({
+        ...state.street,
+        placedBuildings: state.street.placedBuildings.map((b) =>
+          b.id === id
+            ? { ...b, tier: 2 as const, popularity: Math.max(b.popularity ?? 1.0, 1.2) }
+            : b,
+        ),
+      }),
+    }));
+    return { ok: true };
+  },
+
+  toggleSweeper: () => set((state) => ({
+    ui: { ...state.ui, sweeperHired: !state.ui.sweeperHired },
+  })),
 });
+
+/** Upgrade cost per building kind. */
+function upgradeCost(kind: string): number {
+  switch (kind) {
+    case 'theatre': return 40_000;
+    case 'restaurant': return 12_000;
+    case 'cart': return 2_500;
+    default: return 5_000;
+  }
+}

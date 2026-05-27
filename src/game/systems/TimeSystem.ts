@@ -67,6 +67,8 @@ export function tickTime(dtMS: number): void {
       root.advanceDay();
     }
     tickConstruction(dayAdvances);
+    tickLitter(dayAdvances);
+    tickSweeperPayroll(dayAdvances);
   }
 }
 
@@ -79,11 +81,39 @@ function tickConstruction(days: number): void {
         ? { ...b, constructionDaysLeft: Math.max(0, b.constructionDaysLeft - days) }
         : b,
     );
-    // Did anything finish on this tick? Only recompute buzz if so.
     const finishedNow = updated.some((b, i) =>
       b.constructionDaysLeft === 0 && state.street.placedBuildings[i].constructionDaysLeft > 0,
     );
     const nextStreet = { ...state.street, placedBuildings: updated };
     return { street: finishedNow ? withRecomputedBuzz(nextStreet) : nextStreet };
   });
+}
+
+/** Litter decays by 1 amount per day; reaches 0 → removed. Sweeper clears 1 unit. */
+function tickLitter(days: number): void {
+  useGameStore.setState((state) => {
+    if (state.street.litter.length === 0) return state;
+    // Natural decay
+    let litter = state.street.litter
+      .map((l) => ({ ...l, amount: l.amount - days }))
+      .filter((l) => l.amount > 0);
+    // Sweeper: removes one full litter spot per day (highest-amount first)
+    if (state.ui.sweeperHired && litter.length > 0) {
+      for (let i = 0; i < days; i++) {
+        if (litter.length === 0) break;
+        litter.sort((a, b) => b.amount - a.amount);
+        litter = litter.slice(1); // remove the worst spot wholesale
+      }
+    }
+    return { street: withRecomputedBuzz({ ...state.street, litter }) };
+  });
+}
+
+/** Sweeper costs $50/day when hired. */
+const SWEEPER_DAILY_COST = 50;
+function tickSweeperPayroll(days: number): void {
+  const root = useGameStore.getState();
+  if (!root.ui.sweeperHired) return;
+  const cost = SWEEPER_DAILY_COST * days;
+  root.removeCash(cost, 'staff', `Sweeper x${days}d`);
 }

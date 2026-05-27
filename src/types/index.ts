@@ -306,6 +306,8 @@ export interface UIState {
   showBuzzOverlay: boolean;
   /** Theatre District: TheatreModal is open for the currently selected theatre. */
   theatreModalOpen: boolean;
+  /** Theatre District: street sweeper hired (clears 1 litter/day, costs daily fee). */
+  sweeperHired: boolean;
 }
 
 export interface Notification {
@@ -502,6 +504,8 @@ export interface PlacedBuilding {
   popularity?: number;
   /** Last performance result, shown in TheatreModal. */
   lastPerformance?: PerformanceSummary;
+  /** Amenity upgrade tier. 1 = baseline, 2 = upgraded (boosted base buzz). */
+  tier?: 1 | 2;
 }
 
 export interface PlacedDecoration {

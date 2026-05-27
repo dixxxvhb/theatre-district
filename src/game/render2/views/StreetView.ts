@@ -17,12 +17,15 @@ import { BuildingSprite } from '../entities/BuildingSprite';
 import { DecorationSprite } from '../entities/DecorationSprite';
 import { BuzzOverlay } from './BuzzOverlay';
 import { CrowdRenderer } from './CrowdRenderer';
+import { LitterLayer } from './LitterLayer';
+import type { StreetLitter } from '../../../types';
 
 export interface StreetViewInputs {
   bounds: GridBounds;
   ownedTiles: Set<string>;
   buildings: PlacedBuilding[];
   decoration: PlacedDecoration[];
+  litter: StreetLitter[];
   hoveredTile: { x: number; y: number } | null;
   selectedTile: { x: number; y: number } | null;
   ghost: GhostState | null;
@@ -41,6 +44,7 @@ export interface GhostState {
 export class StreetView {
   readonly container = new Container();
   readonly tileLayer: TileLayer;
+  readonly litterLayer: LitterLayer;
   readonly buzzOverlay: BuzzOverlay;
   readonly crowdRenderer: CrowdRenderer;
   private buildingSprites = new Map<string, BuildingSprite>();
@@ -52,6 +56,8 @@ export class StreetView {
     this.container.sortableChildren = true;
     this.tileLayer = new TileLayer();
     this.container.addChild(this.tileLayer.container);
+    this.litterLayer = new LitterLayer();
+    this.container.addChild(this.litterLayer.container);
     this.buzzOverlay = new BuzzOverlay();
     this.container.addChild(this.buzzOverlay.container);
     this.crowdRenderer = new CrowdRenderer();
@@ -66,6 +72,7 @@ export class StreetView {
     this.updateHover(inputs);
     this.updateBuildings(inputs.buildings);
     this.updateDecoration(inputs.decoration);
+    this.litterLayer.draw(inputs.litter);
     this.updateBuzzOverlay(inputs);
     this.drawGhost(inputs.ghost);
   }
@@ -170,6 +177,7 @@ export class StreetView {
     this.ghostGraphics.destroy();
     this.buzzOverlay.destroy();
     this.crowdRenderer.destroy();
+    this.litterLayer.destroy();
     this.container.destroy();
   }
 }

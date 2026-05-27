@@ -31,6 +31,7 @@ export function Render2Canvas() {
   const buzzFieldWidth = useGameStore((s) => s.street.buzzFieldWidth);
   const buzzFieldHeight = useGameStore((s) => s.street.buzzFieldHeight);
   const showBuzzOverlay = useGameStore((s) => s.ui.showBuzzOverlay);
+  const litter = useGameStore((s) => s.street.litter);
   const selectedTile = useGameStore((s) => s.ui.selectedTile);
   const camera = useGameStore((s) => s.camera);
   const setCamera = useGameStore((s) => s.setCamera);
@@ -110,7 +111,7 @@ export function Render2Canvas() {
   // Re-paint scene on relevant state changes.
   useEffect(() => {
     paintAll();
-  }, [bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, plots, buildings, decoration, selectedTile, buzzField, showBuzzOverlay]);
+  }, [bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, plots, buildings, decoration, litter, selectedTile, buzzField, showBuzzOverlay]);
 
   // Recenter when bounds expand.
   useEffect(() => {
@@ -132,6 +133,7 @@ export function Render2Canvas() {
       ownedTiles,
       buildings,
       decoration,
+      litter,
       hoveredTile: hoveredRef.current,
       selectedTile,
       ghost: computeGhost(hoveredRef.current),

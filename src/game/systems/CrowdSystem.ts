@@ -18,6 +18,7 @@
 
 import { useGameStore } from '../../store/gameStore';
 import { BUILDING_DEFINITIONS } from '../data/street';
+import { withRecomputedBuzz } from './BuzzSystem';
 
 export const MAX_AGENTS = 300;
 
@@ -303,6 +304,8 @@ function updateAgents(dt: number): void {
         state.mood[i] = Math.min(MAX_MOOD, state.mood[i] + SPEND_MOOD_BUMP);
         state.spendTicks[i] = SPEND_TICKS[hit.kind] ?? 30;
         state.state[i] = AGENT_STATE.SPENDING;
+        // Crowd activity → occasional litter on adjacent owned tile.
+        maybeDropLitter(cx, cy);
         continue;
       }
     }
@@ -376,6 +379,54 @@ function stepAgent(i: number, dt: number): void {
   state.velY[i] += (desiredVY - state.velY[i]) * VELOCITY_LERP;
   state.posX[i] += state.velX[i] * dt;
   state.posY[i] += state.velY[i] * dt;
+}
+
+// 5% chance per spend to drop litter on a random adjacent owned tile.
+// Cumulative on existing litter spots. Triggers a buzz recompute through
+// withRecomputedBuzz so the negative emission applies the same tick.
+const LITTER_DROP_CHANCE = 0.05;
+
+function maybeDropLitter(cx: number, cy: number): void {
+  if (Math.random() > LITTER_DROP_CHANCE) return;
+  const root = useGameStore.getState();
+  const street = root.street;
+  const owned = new Set(street.plots.map((p) => `${p.x},${p.y}`));
+  // Pick one of 4 neighbor tiles if owned + not occupied by a building footprint
+  const neighbors = [
+    { x: cx - 1, y: cy },
+    { x: cx + 1, y: cy },
+    { x: cx, y: cy - 1 },
+    { x: cx, y: cy + 1 },
+  ].filter((n) => owned.has(`${n.x},${n.y}`));
+  if (neighbors.length === 0) return;
+  // Avoid landing in a building footprint
+  const buildingFootprintKeys = new Set<string>();
+  for (const b of street.placedBuildings) {
+    const def = BUILDING_DEFINITIONS[b.kind];
+    for (let dy = 0; dy < def.footprint.height; dy++) {
+      for (let dx = 0; dx < def.footprint.width; dx++) {
+        buildingFootprintKeys.add(`${b.position.x + dx},${b.position.y + dy}`);
+      }
+    }
+  }
+  const valid = neighbors.filter((n) => !buildingFootprintKeys.has(`${n.x},${n.y}`));
+  if (valid.length === 0) return;
+  const pick = valid[Math.floor(Math.random() * valid.length)];
+
+  useGameStore.setState((state) => {
+    const existing = state.street.litter.find((l) => l.x === pick.x && l.y === pick.y);
+    let litter: typeof state.street.litter;
+    if (existing) {
+      litter = state.street.litter.map((l) =>
+        l.x === pick.x && l.y === pick.y
+          ? { ...l, amount: Math.min(5, l.amount + 1) }
+          : l,
+      );
+    } else {
+      litter = [...state.street.litter, { x: pick.x, y: pick.y, amount: 1 }];
+    }
+    return { street: withRecomputedBuzz({ ...state.street, litter }) };
+  });
 }
 
 function maybeDespawnAtEdge(i: number, minX: number, maxX: number, minY: number, maxY: number): void {
