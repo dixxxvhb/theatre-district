@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { CREW_ROLE_DEFINITIONS, generateCrewCandidate } from '../../game/data/staff';
 import { GAME_CONSTANTS } from '../../game/data/constants';
+import { getPresetById } from '../../game/data/presets';
 import type { CrewMember, CrewRole } from '../../types';
 
 /* ── role → color map for crew badges & bulletin pins ── */
@@ -167,15 +168,18 @@ export function StaffPanel() {
   const isMusical = activeShow?.genre === 'musical';
   const showComplexity = activeShow?.complexity ?? 1;
 
-  // Determine max crew from office
+  // Determine max crew from office (preset can override the level-based cap)
   const officeRoom = activeProperty?.rooms.find((r) => r.type === 'office' && !r.isConstructing);
   const officeLevel = officeRoom?.level ?? 0;
-  const maxCrew =
+  const officePreset = officeRoom?.presetId ? getPresetById(officeRoom.presetId) : undefined;
+  const officePresetCap = officePreset?.modifiers.crewCapacity;
+  const levelCap =
     officeLevel === 0
       ? GAME_CONSTANTS.CREW.NO_OFFICE_MAX_CREW
       : officeLevel >= 2
         ? GAME_CONSTANTS.CREW.UPGRADED_OFFICE_MAX_CREW
         : GAME_CONSTANTS.CREW.BASIC_OFFICE_MAX_CREW;
+  const maxCrew = officePresetCap !== undefined ? Math.max(levelCap, officePresetCap) : levelCap;
 
   const [expandedRole, setExpandedRole] = useState<CrewRole | null>(null);
   const [candidates, setCandidates] = useState<Record<string, CrewMember[]>>({});

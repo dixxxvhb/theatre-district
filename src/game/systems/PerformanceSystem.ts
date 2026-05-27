@@ -4,6 +4,38 @@ import { getDayOfWeek, isPerformanceDay } from '../engine/TimeManager';
 import { GAME_CONSTANTS } from '../data/constants';
 import { calculateBuzzShare } from './RivalSystem';
 import { useGameStore } from '../../store/gameStore';
+import { getPresetById } from '../data/presets';
+
+interface AggregatedPresetMods {
+  ticketPriceBonus: number;       // additive (e.g. 0.05 = +5%)
+  capacityMultiplier: number;     // product across seating rooms
+  qualityBonus: number;           // additive points 0-100
+  genreBonusByGenre: Record<string, number>;  // additive per genre
+}
+
+function aggregatePresetModifiers(rooms: Room[]): AggregatedPresetMods {
+  const out: AggregatedPresetMods = {
+    ticketPriceBonus: 0,
+    capacityMultiplier: 1,
+    qualityBonus: 0,
+    genreBonusByGenre: {},
+  };
+  for (const room of rooms) {
+    if (!room.presetId || room.isConstructing) continue;
+    const preset = getPresetById(room.presetId);
+    if (!preset) continue;
+    const m = preset.modifiers;
+    out.ticketPriceBonus += m.ticketPriceBonus;
+    if (room.type === 'seating') out.capacityMultiplier *= m.capacityMultiplier;
+    out.qualityBonus += m.qualityBonus;
+    if (m.genreBonus) {
+      for (const gb of m.genreBonus) {
+        out.genreBonusByGenre[gb.genre] = (out.genreBonusByGenre[gb.genre] ?? 0) + gb.bonus;
+      }
+    }
+  }
+  return out;
+}
 
 const DAY_OF_WEEK_MODIFIERS: Record<string, number> = {
   Mon: 0,    // dark day — no performance
@@ -80,12 +112,20 @@ export function calculatePerformance(input: PerformanceInput): PerformanceResult
   }
 
   const rooms = property.rooms;
-  const maxSeats = getSeatingCapacity(rooms);
-  if (maxSeats === 0) return null;
+  const baseSeats = getSeatingCapacity(rooms);
+  if (baseSeats === 0) return null;
 
-  // Quality score — use show.quality which should be pre-calculated
-  const showQuality = Math.max(1, show.quality);
+  // Apply room presets — capacity multiplier from seating presets, plus quality / ticket / genre bonuses.
+  const presetMods = aggregatePresetModifiers(rooms);
+  const maxSeats = Math.floor(baseSeats * presetMods.capacityMultiplier);
+  const genreBonus = presetMods.genreBonusByGenre[show.genre] ?? 0;
+
+  // Quality score — use show.quality (pre-calculated) plus aggregated preset bonuses, clamped 0-100.
+  const showQuality = Math.max(1, Math.min(100, show.quality + presetMods.qualityBonus + genreBonus));
   const buzzScore = Math.max(1, show.buzzScore);
+
+  // Preset-adjusted ticket price.
+  const adjustedTicketPrice = ticketPrice * (1 + presetMods.ticketPriceBonus);
 
   // Base attendance
   const baseAttendance = maxSeats * (showQuality / 100) * (buzzScore / 100);
@@ -113,13 +153,13 @@ export function calculatePerformance(input: PerformanceInput): PerformanceResult
   );
 
   // Revenue
-  const ticketRevenue = attendance * ticketPrice;
+  const ticketRevenue = attendance * adjustedTicketPrice;
   const hasConcession = rooms.some((r) => r.type === 'concession' && !r.isConstructing);
   const concessionRevenue = hasConcession ? attendance * 2 : 0;
   const hasVipLounge = rooms.some((r) => r.type === 'vip_lounge' && !r.isConstructing);
   const vipSeats = getVipSeats(rooms);
   const vipAttendees = hasVipLounge ? Math.min(vipSeats, Math.floor(attendance * 0.1)) : 0;
-  const vipPrice = ticketPrice * 2.5;
+  const vipPrice = adjustedTicketPrice * 2.5;
   const vipRevenue = vipAttendees * vipPrice;
   const totalRevenue = ticketRevenue + concessionRevenue + vipRevenue;
 
