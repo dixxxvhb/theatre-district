@@ -4,6 +4,34 @@ import { GAME_CONSTANTS } from '../game/data/constants';
 import { ROOM_DEFINITIONS } from '../game/data/rooms';
 import { canPlaceRoom, placeRoomOnGrid, removeRoomFromGrid } from '../game/systems/BuildingSystem';
 import { createAllRivals } from '../game/data/rivals';
+import { createStreetSlice, createEmptyStreet, STREET_PERSIST_KEYS, type StreetSlice } from './slices/streetSlice';
+
+/**
+ * Persist-keys pattern: lists the state field names that get serialized to
+ * save files. Action functions are excluded by construction (they're not in
+ * this list). Adding a new state field = add its key here. No more 70-action
+ * destructure to keep in sync.
+ *
+ * Each slice contributes its own *_PERSIST_KEYS array; ALL_PERSIST_KEYS
+ * concatenates them. Future slice extractions move keys out of MAIN_PERSIST_KEYS
+ * and into their slice's array.
+ */
+const MAIN_PERSIST_KEYS = [
+  'initialized', 'theaterName',
+  'time', 'economy', 'reputation', 'ui',
+  'properties', 'activePropertyId',
+  'shows', 'activeShowId', 'showOptions',
+  'castMembers', 'crew',
+  'events', 'performanceHistory',
+  'grid', 'camera',
+  'ticketPrice', 'activeMarketingCampaigns', 'runDay',
+  'rehearsalLog', 'lowAttendanceStreak', 'runSummary',
+  'showOpeningNightModal', 'pendingTonyShowId',
+  'lastDirectorDecisionDay', 'usedDirectorDecisionIds',
+  'campaign', 'rivals',
+] as const satisfies ReadonlyArray<keyof GameState>;
+
+const ALL_PERSIST_KEYS = [...MAIN_PERSIST_KEYS, ...STREET_PERSIST_KEYS] as const;
 
 const initialState: GameState = {
   initialized: false,
@@ -89,6 +117,8 @@ const initialState: GameState = {
     gameOverReason: null,
   },
   rivals: [],
+
+  street: createEmptyStreet(),
 };
 
 interface GameActions {
@@ -201,8 +231,9 @@ interface GameActions {
   loadState: (state: GameState) => void;
 }
 
-export const useGameStore = create<GameState & GameActions>((set, get) => ({
+export const useGameStore = create<GameState & GameActions & StreetSlice>((set, get, store) => ({
   ...initialState,
+  ...createStreetSlice(set, get, store),
 
   initGame: (theaterName: string) => set({
     ...initialState,
@@ -210,9 +241,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     theaterName,
     ui: { ...initialState.ui, currentPhase: 'property_select' },
     rivals: createAllRivals(),
+    street: createEmptyStreet(),
   }),
 
-  resetGame: () => set(initialState),
+  resetGame: () => set({ ...initialState, street: createEmptyStreet() }),
 
   setSpeed: (speed) => set((s) => ({
     time: { ...s.time, speed, isPaused: speed === 'paused' },
@@ -701,10 +733,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   })),
 
   getSerializableState: () => {
-    const state = get();
-    // Strip action functions, return only data
-    const { initGame, resetGame, setSpeed, togglePause, advanceDay, setPhase, setViewMode, selectRoomType, selectTile, openPanel, closePanel, addCash, removeCash, setCamera, initGrid, setCell, getCell, purchaseProperty, setActiveProperty, placeRoom, demolishRoom, setShowOptions, selectShow, clearShowOptions, hireCrew, fireCrew, castRole, startRehearsals, addRehearsalLog, updateShow, addMarketingCampaign, setMarketingCampaigns, setTicketPrice, processPerformance, setRunDay, setLowAttendanceStreak, addEvent, resolveEvent, applyEventEffects, closeShow, clearRunSummary, setShowOpeningNightModal, dismissOpeningNight, getSerializableState, loadState, toggleRenovate, advanceAct, checkLossConditions, incrementShowCount, setTrend, setNextTrend, setGameOver, setLowAttendanceWeeks, initRivals, activateRival, updateRival, setRoomPreset, nominateForTony, awardTony, clearPendingTonyShowId, recordDirectorDecision, resetDirectorDecisions, ...data } = state;
-    return data as GameState;
+    // Pick only declared state keys; action functions are excluded by construction.
+    // To persist a new field: add its key to MAIN_PERSIST_KEYS (or the slice's
+    // *_PERSIST_KEYS array). No per-action destructure edits required.
+    const state = get() as unknown as Record<string, unknown>;
+    const out = {} as Record<string, unknown>;
+    for (const key of ALL_PERSIST_KEYS) {
+      out[key] = state[key];
+    }
+    return out as unknown as GameState;
   },
 
   loadState: (state) => set(state),

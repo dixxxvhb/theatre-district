@@ -31,8 +31,8 @@ export const CAMERA = {
 } as const;
 
 export const TILE = {
-  ISO_WIDTH: 128,           // Kenney isometric tile family base width (street layer)
-  ISO_HEIGHT: 64,           // Kenney isometric tile family base height (street layer)
+  ISO_WIDTH: 256,           // Kenney isometric tile family base width — locked per spec
+  ISO_HEIGHT: 128,          // Kenney isometric tile family base height (2:1 ratio)
   FLOOR_SIZE: 32,           // legacy floor-plan cell size — unchanged for legacy renderer
   GRID_LINE_COLOR: 0x2a2a4e,
   GRID_LINE_WIDTH: 1,

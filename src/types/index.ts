@@ -444,6 +444,70 @@ export interface CampaignState {
 
 export type NotificationType = 'info' | 'money' | 'rival' | 'trend' | 'danger' | 'achievement' | 'warning' | 'success' | 'error';
 
+// ============================================================
+// Street layer (Theatre District — outdoor city-builder)
+// ============================================================
+
+export type BuildingKind = 'theatre' | 'restaurant' | 'cart';
+
+export type DecorationKind = 'lamp' | 'tree' | 'fountain' | 'bench' | 'poster' | 'string_lights';
+
+export type DailyPhase = 'quiet' | 'preshow' | 'curtain' | 'postshow' | 'winddown';
+
+export interface StreetBounds {
+  minX: number;
+  maxX: number; // inclusive
+  minY: number;
+  maxY: number; // inclusive
+}
+
+export interface StreetPlot {
+  x: number;
+  y: number;
+  acquiredDay: number;
+}
+
+export interface PlacedBuilding {
+  id: string;
+  kind: BuildingKind;
+  position: Position;
+  footprint: Size;
+  constructedDay: number;
+  constructionDaysLeft: number;
+  theatreId?: string; // for kind='theatre', links to the Theatre layer entity
+}
+
+export interface PlacedDecoration {
+  id: string;
+  kind: DecorationKind;
+  position: Position; // single-tile
+  placedDay: number;
+}
+
+export interface StreetLitter {
+  x: number;
+  y: number;
+  amount: number;
+}
+
+/**
+ * StreetState — single source of truth for the outdoor street layer.
+ * buzzField is a flat Float32Array sized buzzFieldWidth * buzzFieldHeight,
+ * indexed (gx - bounds.minX) + (gy - bounds.minY) * buzzFieldWidth.
+ * Resized on plot acquisition. Round-tripped as base64 in saves.
+ */
+export interface StreetState {
+  bounds: StreetBounds;
+  plots: StreetPlot[];
+  placedBuildings: PlacedBuilding[];
+  decoration: PlacedDecoration[];
+  litter: StreetLitter[];
+  buzzField: Float32Array;
+  buzzFieldWidth: number;
+  buzzFieldHeight: number;
+  dailyPhase: DailyPhase;
+}
+
 export interface GameState {
   // Meta
   initialized: boolean;
@@ -493,4 +557,7 @@ export interface GameState {
   // Director-decision persistence (per-rehearsal)
   lastDirectorDecisionDay: number;
   usedDirectorDecisionIds: string[];
+
+  // Street layer (Theatre District v2)
+  street: StreetState;
 }

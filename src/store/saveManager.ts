@@ -1,15 +1,19 @@
-// Save/Load system for Broadway Tycoon
-// Uses localStorage with JSON serialization.
+// Save/Load system for Broadway Tycoon / Theatre District.
+// localStorage with JSON serialization; custom replacer/reviver round-trip
+// typed arrays (Float32Array — used for street.buzzField).
 
 import type { GameState, SaveSlot } from '../types';
+import { createEmptyStreet } from './slices/streetSlice';
 
 const SAVE_KEY_PREFIX = 'broadway-tycoon-save-';
 const AUTOSAVE_SLOT = 'autosave';
 const MAX_MANUAL_SLOTS = 5;
 const SAVE_INDEX_KEY = 'broadway-tycoon-save-index';
 
-// Bump on any state-shape change. v2 adds: campaign, rivals, ui.isRenovating, room.presetId.
-const SAVE_VERSION = 2;
+// Bump on any state-shape change.
+//   v2: campaign, rivals, ui.isRenovating, room.presetId
+//   v3: street layer (Theatre District) — additive, default via createEmptyStreet
+const SAVE_VERSION = 3;
 
 interface SaveEnvelope {
   version: number;
@@ -22,7 +26,7 @@ interface SaveEnvelope {
 export function saveGame(slotId: string, state: GameState): void {
   const key = SAVE_KEY_PREFIX + slotId;
   const envelope: SaveEnvelope = { version: SAVE_VERSION, state };
-  localStorage.setItem(key, JSON.stringify(envelope));
+  localStorage.setItem(key, JSON.stringify(envelope, serializeReplacer));
   updateSaveIndex(slotId, state);
 }
 
@@ -35,7 +39,7 @@ export function loadGame(slotId: string): GameState | null {
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw, deserializeReviver);
     const state = migrate(unwrap(parsed));
     if (!isValid(state, slotId)) return null;
     return state;
@@ -89,7 +93,7 @@ export function exportSave(slotId: string): string {
 export function importSave(data: string): GameState | null {
   try {
     const json = atob(data);
-    const parsed = JSON.parse(json);
+    const parsed = JSON.parse(json, deserializeReviver);
     const state = migrate(unwrap(parsed));
     if (typeof state.theaterName !== 'string') return null;
     if (typeof state.time?.day !== 'number') return null;
@@ -172,8 +176,35 @@ function migrate(raw: GameState): GameState {
         presetId: r.presetId ?? null,
       })),
     })),
+    // v3: street layer (Theatre District). Pre-v3 saves have no street — default to fresh.
+    // Float32Array rehydration is handled by deserializeReviver on the wire, so the
+    // street.buzzField here is already a typed array if it was present.
+    street: raw.street ?? createEmptyStreet(),
   };
   return migrated;
+}
+
+// JSON.stringify replacer — encodes Float32Array as a tagged plain object.
+// Catches any typed-array fields anywhere in state.
+const FLOAT32_TAG = '__Float32Array__';
+function serializeReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Float32Array) {
+    return { [FLOAT32_TAG]: Array.from(value) };
+  }
+  return value;
+}
+
+// JSON.parse reviver — rehydrates the tagged Float32Array.
+function deserializeReviver(_key: string, value: unknown): unknown {
+  if (
+    value &&
+    typeof value === 'object' &&
+    FLOAT32_TAG in (value as Record<string, unknown>)
+  ) {
+    const arr = (value as Record<string, unknown>)[FLOAT32_TAG];
+    if (Array.isArray(arr)) return new Float32Array(arr);
+  }
+  return value;
 }
 
 function isValid(state: GameState, slotId: string): boolean {

@@ -6,12 +6,12 @@ Broadway Tycoon is a browser-based theater management simulation game. The playe
 **Full Game Design Document:** `docs/BROADWAY_TYCOON_GDD.md` — this is the source of truth for all game design decisions. Read the relevant section(s) before implementing any feature.
 
 ## Tech Stack
-- **Rendering:** PixiJS v8 + @pixi/react (game canvas)
+- **Rendering:** PixiJS v8 — **imperative**, NOT `@pixi/react`. (CLAUDE.md previously misstated this; `@pixi/react` is in `package.json` but unused.)
 - **UI:** React 19 + TypeScript (menus, panels, overlays)
 - **Build:** Vite
-- **State:** Zustand (single serializable store shared by PixiJS and React)
+- **State:** Zustand v5 — slice-composition pattern (see `src/store/slices/streetSlice.ts` for the canonical example)
 - **Styling:** Tailwind CSS v4 (UI only, not canvas)
-- **Save:** localStorage (MVP), Firebase Firestore (post-MVP)
+- **Save:** localStorage with versioned migration + custom Float32Array round-trip
 - **Source control:** GitHub
 
 ## Architecture Rules — READ THESE FIRST
@@ -67,10 +67,26 @@ Follow this sequence. Each step should be a working, testable increment:
 Mark ✅ as each step completes.
 
 ## Current State
-- **Phase:** Playable MVP
-- **Last completed:** Step 17 — Full loop integration
-- **Current blocker:** None
-- **Next priority:** Step 18 — UI polish (dashboards, graphs, notifications, tooltips)
+- **Active branch:** `feature/theatre-district` — building "Theatre District," a fusion of an expandable iso STREET city-builder with the existing show-production systems opened as click-into modals.
+- **Last completed:** Theatre District Session 1 — iso street foundation (expandable tile grid, coord math, depth sort, asset pipeline scaffold, slice-composition pattern, save v3 with Float32Array round-trip).
+- **Live handoff:** `docs/theatre-district/SESSION-1-HANDOFF.md`
+- **Next priority:** Session 2 — direct placement & street builder (placement UI, building sprites, plot acquisition, Kenney atlas drop + recolor pass).
+- **`main`** still has playable Broadway Tycoon v2.1.0. Theatre District work won't reach main until at least after MANDATORY STOP 2 (end of Session 4) plus user playtest sign-off.
+- **`USE_RENDER2` flag** (`.env.local` → `VITE_USE_RENDER2=true`) toggles new street renderer vs legacy floor plan. Dev runs with it ON.
+
+## Theatre District Plan
+Multi-session autonomous build per the user's spec. Session sequence:
+- ✅ Session 0 — Audit & architecture (mandatory stop 1, approved)
+- ✅ Session 1 — Isometric street foundation
+- 🔲 Session 2 — Direct placement & street builder
+- 🔲 Session 3 — Buzz engine + heat-map overlay (spec is LOCKED, do not redesign)
+- 🔲 Session 4 — ParticleContainer crowd → MANDATORY STOP 2 (user playtest)
+- 🔲 Session 5 — Showtime rhythm
+- 🔲 Session 6 — Reintegrate Theatre layer (cast/rehearsal/events/Tony as modal)
+- 🔲 Session 7 — Reactive texture (litter, staff, amenity upgrades)
+- 🔲 Session 8 — Visual cohesion (palette enforcement, lighting, UI restyle)
+
+Hard rules: do not rewrite show logic (reuse); preserve & extend versioned save; no backend; no audio; no AI-generated art; do not redesign the Buzz spec; stop at every stop point.
 
 ## GDD Updates Needed
 If implementation reveals a design issue, do NOT change the GDD. Instead:
@@ -88,6 +104,7 @@ If implementation reveals a design issue, do NOT change the GDD. Instead:
 - **2026-03-28:** GDD v1.0 re-drafted (previous version lost from chat context). Full 18-section GDD at `docs/BROADWAY_TYCOON_GDD.md`. Pending Dixon review before scaffolding.
 - **2026-03-28:** Step 1 complete. Vite + React 19 + TS + PixiJS v8 + @pixi/react + Zustand v5 + Tailwind v4 scaffolded. 13 Zustand slices, full type system, all balance constants. Dev server running at localhost:5173. Build passes clean.
 - **2026-03-28:** Steps 2-17 complete in one session. Consolidated project from Desktop duplicates to ~/Documents/Claude Projects/Code/broadway-tycoon/. Complete GDD (1469 lines, 18 sections) restored. All systems built: canvas+camera, grid+tiles, room placement+validation, time system, property selection, economy, show generation+picker, auditions+casting, crew hiring, rehearsal system, marketing campaigns, nightly performance loop, event system (15 events), run management, save/load (5 slots + autosave), full game loop integration with phase transitions, toast notifications, keyboard shortcuts. Build passes clean. Game is playable end-to-end.
+- **2026-05-27:** Theatre District pivot. Session 0 audit + architecture approved (LOW reuse cost, PerformanceSystem input refactor in-scope, slice composition adopted). Session 1 complete: salvaged iso renderer primitives from abandoned Phase A-D multi-floor work onto new `feature/theatre-district` branch off main; added street slice + `StreetState` types + save v3 (additive, Float32Array round-trip); rendered placeholder street smoke-verified. Pre-Theatre-District multi-floor snapshot preserved on `archive/session-1-multifloor`.
 
 ## Dev Server
 - Command: `npm run dev`
