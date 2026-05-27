@@ -97,6 +97,16 @@ export class IsoEngine {
     this.worldContainer.scale.set(zoom);
   }
 
+  /** Replace the background fill color (used to tint the canvas per daily phase). */
+  setBackgroundColor(color: number): void {
+    if (!this.app || !this.background) return;
+    const w = this.app.canvas.width / (window.devicePixelRatio || 1);
+    const h = this.app.canvas.height / (window.devicePixelRatio || 1);
+    this.background.clear();
+    this.background.rect(0, 0, w, h);
+    this.background.fill(color);
+  }
+
   dispose(): void {
     this.camera.dispose();
     this.resizeObserver?.disconnect();

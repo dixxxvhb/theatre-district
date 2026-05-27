@@ -32,6 +32,7 @@ export function Render2Canvas() {
   const buzzFieldHeight = useGameStore((s) => s.street.buzzFieldHeight);
   const showBuzzOverlay = useGameStore((s) => s.ui.showBuzzOverlay);
   const litter = useGameStore((s) => s.street.litter);
+  const dailyPhase = useGameStore((s) => s.street.dailyPhase);
   const selectedTile = useGameStore((s) => s.ui.selectedTile);
   const camera = useGameStore((s) => s.camera);
   const setCamera = useGameStore((s) => s.setCamera);
@@ -123,6 +124,12 @@ export function Render2Canvas() {
     engineRef.current?.applyCamera(camera.x, camera.y, camera.zoom);
   }, [camera]);
 
+  // Tint canvas background per daily phase.
+  useEffect(() => {
+    const color = PHASE_BG[dailyPhase] ?? 0x0f0f1a;
+    engineRef.current?.setBackgroundColor(color);
+  }, [dailyPhase]);
+
   function paintAll() {
     const v = viewRef.current;
     if (!v) return;
@@ -163,6 +170,15 @@ export function Render2Canvas() {
 // ============================================================
 // Clock + phase indicator overlay
 // ============================================================
+
+// Canvas background tint per daily phase — subtle theatricality.
+const PHASE_BG: Record<string, number> = {
+  quiet:    0x121823,  // neutral midnight
+  preshow:  0x1d1a18,  // warm dusk
+  curtain:  0x1a0e14,  // deep velvet (lights down)
+  postshow: 0x231a14,  // golden after-glow
+  winddown: 0x111824,  // cool slate
+};
 
 const PHASE_LABEL: Record<string, string> = {
   quiet:    'Quiet Afternoon',

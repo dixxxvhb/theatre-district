@@ -5,6 +5,7 @@ import { ROOM_DEFINITIONS } from '../game/data/rooms';
 import { canPlaceRoom, placeRoomOnGrid, removeRoomFromGrid } from '../game/systems/BuildingSystem';
 import { createAllRivals } from '../game/data/rivals';
 import { createStreetSlice, createEmptyStreet, STREET_PERSIST_KEYS, type StreetSlice } from './slices/streetSlice';
+import { USE_RENDER2 } from '../game/data/constants';
 
 /**
  * Persist-keys pattern: lists the state field names that get serialized to
@@ -244,7 +245,14 @@ export const useGameStore = create<GameState & GameActions & StreetSlice>((set, 
     ...initialState,
     initialized: true,
     theaterName,
-    ui: { ...initialState.ui, currentPhase: 'property_select' },
+    // Theatre District (USE_RENDER2) skips the legacy property-select flow and
+    // lands the player directly on the street in build phase.
+    ui: {
+      ...initialState.ui,
+      currentPhase: USE_RENDER2 ? 'building' : 'property_select',
+    },
+    // Auto-unpause for Theatre District so time + crowd start flowing immediately
+    time: { ...initialState.time, isPaused: !USE_RENDER2 },
     rivals: createAllRivals(),
     street: createEmptyStreet(),
   }),
