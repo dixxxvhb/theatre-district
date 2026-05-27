@@ -29,7 +29,7 @@ import {
   DECORATION_DEFINITIONS,
   plotAcquisitionCost,
 } from '../../game/data/street';
-import { computeBuzz } from '../../game/systems/BuzzSystem';
+import { withRecomputedBuzz } from '../../game/systems/BuzzSystem';
 
 const STARTING_BOUNDS: StreetBounds = { minX: 0, maxX: 7, minY: 0, maxY: 2 };
 
@@ -53,6 +53,7 @@ export function createEmptyStreet(): StreetState {
     buzzFieldWidth: width,
     buzzFieldHeight: height,
     dailyPhase: 'quiet',
+    timeOfDay: 0,
   };
 }
 
@@ -155,14 +156,9 @@ function newId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
-/**
- * Build a new street object with buzz field recomputed from sources.
- * Locked-spec recompute trigger: every placement / removal / litter / bounds change.
- * Buzz is event-driven, never per-frame.
- */
-function withRecomputedBuzz(next: StreetState): StreetState {
-  return { ...next, buzzField: computeBuzz(next) };
-}
+// withRecomputedBuzz is imported from BuzzSystem so it can be shared with
+// TimeSystem (which needs to recompute when construction completes). The
+// locked-spec recompute trigger is still strictly event-driven, never per-frame.
 
 // ============================================================
 // Slice

@@ -142,6 +142,14 @@ export function buzzAt(street: StreetState, x: number, y: number): number {
   return street.buzzField[idx] ?? 0;
 }
 
+/**
+ * Wrap a street update with a fresh buzz recompute.
+ * Shared by streetSlice (mutations) + TimeSystem (construction-complete transitions).
+ */
+export function withRecomputedBuzz(next: StreetState): StreetState {
+  return { ...next, buzzField: computeBuzz(next) };
+}
+
 /** Min and max values in the field — used to normalize the heat-map gradient. */
 export function buzzExtent(field: Float32Array): { min: number; max: number } {
   if (field.length === 0) return { min: 0, max: 0 };

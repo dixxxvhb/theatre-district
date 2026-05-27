@@ -13,7 +13,8 @@ const SAVE_INDEX_KEY = 'broadway-tycoon-save-index';
 // Bump on any state-shape change.
 //   v2: campaign, rivals, ui.isRenovating, room.presetId
 //   v3: street layer (Theatre District) — additive, default via createEmptyStreet
-const SAVE_VERSION = 3;
+//   v4: street.timeOfDay (drives dailyPhase)
+const SAVE_VERSION = 4;
 
 interface SaveEnvelope {
   version: number;
@@ -179,7 +180,10 @@ function migrate(raw: GameState): GameState {
     // v3: street layer (Theatre District). Pre-v3 saves have no street — default to fresh.
     // Float32Array rehydration is handled by deserializeReviver on the wire, so the
     // street.buzzField here is already a typed array if it was present.
-    street: raw.street ?? createEmptyStreet(),
+    // v4: street.timeOfDay added; default 0 for pre-v4 saves missing it.
+    street: raw.street
+      ? { ...raw.street, timeOfDay: raw.street.timeOfDay ?? 0 }
+      : createEmptyStreet(),
   };
   return migrated;
 }

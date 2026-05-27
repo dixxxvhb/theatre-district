@@ -515,6 +515,8 @@ export interface StreetState {
   buzzFieldWidth: number;
   buzzFieldHeight: number;
   dailyPhase: DailyPhase;
+  /** Fractional progress through current day, 0..1. Drives dailyPhase transitions. */
+  timeOfDay: number;
 }
 
 export interface GameState {

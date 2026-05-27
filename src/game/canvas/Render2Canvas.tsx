@@ -12,6 +12,7 @@ import {
   DECORATION_DEFINITIONS,
 } from '../data/street';
 import { tickCrowd, resetCrowd } from '../systems/CrowdSystem';
+import { tickTime } from '../systems/TimeSystem';
 import type { BuildingKind, DecorationKind } from '../../types';
 
 export function Render2Canvas() {
@@ -49,10 +50,10 @@ export function Render2Canvas() {
       onTick: (dtMS) => {
         const v = viewRef.current;
         if (!v) return;
+        // Time advances first so crowd reads the new dailyPhase this frame.
+        tickTime(dtMS);
         v.setHover(hoveredRef.current);
         v.setGhost(computeGhost(hoveredRef.current));
-        // Crowd: simulate + render. Per-frame; no Zustand thrash because
-        // crowd state lives outside the store.
         tickCrowd(dtMS);
         v.crowdRenderer.sync();
       },
@@ -149,7 +150,55 @@ export function Render2Canvas() {
     eng.centerOnGrid(width, height);
   }
 
-  return <div ref={containerRef} className="w-full h-full" style={{ touchAction: 'none' }} />;
+  return (
+    <div className="relative w-full h-full">
+      <div ref={containerRef} className="w-full h-full" style={{ touchAction: 'none' }} />
+      <StreetClock />
+    </div>
+  );
+}
+
+// ============================================================
+// Clock + phase indicator overlay
+// ============================================================
+
+const PHASE_LABEL: Record<string, string> = {
+  quiet:    'Quiet Afternoon',
+  preshow:  'Pre-Show',
+  curtain:  'Curtain Lull',
+  postshow: 'Post-Show Rush',
+  winddown: 'Wind-Down',
+};
+const PHASE_COLOR: Record<string, string> = {
+  quiet:    'bg-stone-700/70 text-stone-200',
+  preshow:  'bg-amber-700/80 text-amber-100',
+  curtain:  'bg-rose-900/80 text-rose-100',
+  postshow: 'bg-amber-600/80 text-amber-50',
+  winddown: 'bg-slate-700/70 text-slate-200',
+};
+
+function StreetClock() {
+  const day = useGameStore((s) => s.time.day);
+  const phase = useGameStore((s) => s.street.dailyPhase);
+  const timeOfDay = useGameStore((s) => s.street.timeOfDay);
+  const isPaused = useGameStore((s) => s.time.isPaused);
+
+  // Render timeOfDay as a 24-hour clock for flavor
+  const hours = Math.floor(timeOfDay * 24);
+  const minutes = Math.floor((timeOfDay * 24 - hours) * 60);
+  const clock = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+  return (
+    <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-2 select-none">
+      <div className="px-3 py-1.5 rounded bg-stone-950/80 border border-stone-800 text-stone-200 font-mono text-sm">
+        Day {day} · {clock}
+        {isPaused && <span className="ml-2 text-stone-500">paused</span>}
+      </div>
+      <div className={`px-3 py-1.5 rounded text-sm font-medium ${PHASE_COLOR[phase] ?? 'bg-stone-700 text-stone-200'}`}>
+        {PHASE_LABEL[phase] ?? phase}
+      </div>
+    </div>
+  );
 }
 
 // ============================================================

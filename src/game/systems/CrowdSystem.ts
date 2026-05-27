@@ -28,11 +28,11 @@ export const AGENT_STATE = {
   LEAVING:   2,
 } as const;
 
-// Per-kind revenue + spending duration. Provisional — playtest tunes.
+// Per-kind revenue + spending duration. Tuned down from STOP 2 feedback.
 const SPEND_REVENUE: Record<string, number> = {
-  theatre: 5,
-  restaurant: 3,
-  cart: 2,
+  theatre: 3,
+  restaurant: 2,
+  cart: 1,
 };
 const SPEND_TICKS: Record<string, number> = {
   theatre: 90,    // ~1.5s at 60fps
@@ -40,17 +40,28 @@ const SPEND_TICKS: Record<string, number> = {
   cart: 20,
 };
 
-// Wallet bounds (cents, integer for no float drift)
-const WALLET_MIN = 1000;   // $10
-const WALLET_MAX = 3000;   // $30
-const SPEND_MOOD_BUMP = 5; // mood += on successful spend
+// Wallet bounds (cents, integer for no float drift). Tuned down.
+const WALLET_MIN = 500;    // $5
+const WALLET_MAX = 1500;   // $15
+const SPEND_MOOD_BUMP = 5;
 const MAX_MOOD = 100;
 const MIN_MOOD = 20;
-const LEAVE_TICKS = 600;   // soft cap on agent lifetime: 10s
+const LEAVE_TICKS = 600;   // ~10s lifetime cap
 
-// Spawn / despawn cadence
-const SPAWN_BUDGET_PER_TICK = 0.03;  // tunes baseline spawn rate; modulated by buzz
+// Spawn parameters. Saturating curve prevents runaway throughput.
+// baseRate scales linearly with buzz up to a cap, then saturates.
+const SPAWN_BASE_PER_BUZZ = 0.01;
+const SPAWN_MAX_PER_TICK = 0.5;    // hard ceiling: max 30/sec at 60fps
 const MIN_BUZZ_FOR_SPAWN = 1;
+
+// Daily-phase spawn multipliers (read by trySpawn each tick)
+const PHASE_SPAWN_MULT: Record<string, number> = {
+  quiet:     1.0,
+  preshow:   2.0,
+  curtain:   0.4,
+  postshow:  3.0,
+  winddown:  0.7,
+};
 
 // Smoothing
 const VELOCITY_LERP = 0.18;
@@ -157,11 +168,10 @@ export function tickCrowd(dtMS: number): void {
   updateAgents(dt);
 }
 
-/** Spawn budget rolls forward; the more buzz, the more visitors. */
+/** Spawn budget rolls forward; the more buzz, the more visitors. Saturating curve. */
 function trySpawn(dt: number): void {
   const root = useGameStore.getState();
   const street = root.street;
-  // Total positive buzz on the field — drives spawn rate.
   const field = street.buzzField;
   let totalBuzz = 0;
   for (let i = 0; i < field.length; i++) {
@@ -170,16 +180,40 @@ function trySpawn(dt: number): void {
   }
   if (totalBuzz < MIN_BUZZ_FOR_SPAWN) return;
 
-  state.spawnAccum += SPAWN_BUDGET_PER_TICK * totalBuzz * dt;
+  // Saturating: rate = min(MAX, baseRate * buzz). Avoids runaway when buzz is huge.
+  const baseRate = Math.min(SPAWN_MAX_PER_TICK, SPAWN_BASE_PER_BUZZ * totalBuzz);
+  const phaseMult = PHASE_SPAWN_MULT[street.dailyPhase] ?? 1;
+  state.spawnAccum += baseRate * phaseMult * dt;
+
   while (state.spawnAccum >= 1 && state.count < MAX_AGENTS) {
     state.spawnAccum -= 1;
-    // Spawn at a random EDGE tile of the bounds (entering the street)
-    const edge = pickEdgeTile();
-    if (!edge) continue;
-    spawnAt(edge.x, edge.y);
+    const spawn = pickSpawnTile(street.dailyPhase);
+    if (!spawn) continue;
+    spawnAt(spawn.x, spawn.y);
   }
-  // Clamp accumulator so it can't blow up when at capacity
   if (state.count >= MAX_AGENTS) state.spawnAccum = 0;
+}
+
+/**
+ * Where new agents enter the scene. Default = random owned edge tile
+ * (visitors walking in). During post-show: from theatre footprint tiles
+ * (audiences pouring out).
+ */
+function pickSpawnTile(phase: string): { x: number; y: number } | null {
+  if (phase === 'postshow') {
+    const root = useGameStore.getState();
+    const theatres = root.street.placedBuildings.filter(
+      (b) => b.kind === 'theatre' && b.constructionDaysLeft === 0,
+    );
+    if (theatres.length > 0) {
+      const t = theatres[Math.floor(Math.random() * theatres.length)];
+      // Spawn at the front-center tile of the theatre footprint
+      const x = t.position.x + Math.floor(t.footprint.width / 2);
+      const y = t.position.y + t.footprint.height; // one tile in front
+      return { x, y };
+    }
+  }
+  return pickEdgeTile();
 }
 
 /** Pick a random tile on the bounds perimeter that's also owned. */
@@ -256,6 +290,11 @@ function updateAgents(dt: number): void {
     const key = `${cx},${cy}`;
     const hit = buildingAt.get(key);
     if (hit) {
+      // Phase: curtain → if on a theatre tile, agent "enters the show" — despawn.
+      if (street.dailyPhase === 'curtain' && hit.kind === 'theatre') {
+        despawn(i);
+        continue;
+      }
       const rev = SPEND_REVENUE[hit.kind] ?? 1;
       const spend = Math.min(state.wallet[i], rev * 100); // cents
       if (spend > 0) {
