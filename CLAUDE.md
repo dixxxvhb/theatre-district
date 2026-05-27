@@ -68,9 +68,9 @@ Mark ✅ as each step completes.
 
 ## Current State
 - **Active branch:** `feature/theatre-district` — building "Theatre District," a fusion of an expandable iso STREET city-builder with the existing show-production systems opened as click-into modals.
-- **Last completed:** Theatre District Session 3 — Buzz engine + heat-map overlay (LOCKED spec, implemented verbatim). `BuzzSystem.computeBuzz()` pure function with Chebyshev 3-ring linear falloff, building anchors full-strength, decoration per-tile diminishing returns sort (k=0.6), litter negative emission. Event-driven recompute on every placement / removal / plot acquisition. Toggleable heat-map overlay (gold = high, dark = negative). Math hand-verified across 7 sample tiles.
-- **Live handoff:** `docs/theatre-district/SESSION-3-HANDOFF.md`
-- **Next priority:** Session 4 — ParticleContainer crowd. Then MANDATORY STOP 2 (playtest sign-off before continuing).
+- **Last completed:** Theatre District Session 4 — ParticleContainer crowd. CrowdSystem singleton outside Zustand (SoA typed arrays, max 300 agents, freelist O(1) spawn/despawn). Buzz-gradient pathfinding (Chebyshev, greedy with noise). Per-amenity spending: theatre $5 / restaurant $3 / cart $2 with mood bumps + return-to-wandering. CrowdRenderer (first PixiJS v8 ParticleContainer use) with pre-allocated particle pool + procedural 4×4 white texture, tint per state. Smoke verified: 5,401 amenity transactions and $18,669 in revenue in test window, zero console errors. **🛑 STOPPED — awaiting Dixon's playtest sign-off.**
+- **Live handoff:** `docs/theatre-district/SESSION-4-HANDOFF.md`
+- **Next priority:** Wait for playtest. Session 5 (showtime rhythm) starts only when Dixon greenlights.
 - **`main`** still has playable Broadway Tycoon v2.1.0. Theatre District work won't reach main until at least after MANDATORY STOP 2 (end of Session 4) plus user playtest sign-off.
 - **`USE_RENDER2` flag** (`.env.local` → `VITE_USE_RENDER2=true`) toggles new street renderer vs legacy floor plan. Dev runs with it ON.
 
@@ -80,7 +80,7 @@ Multi-session autonomous build per the user's spec. Session sequence:
 - ✅ Session 1 — Isometric street foundation
 - ✅ Session 2 — Direct placement & street builder
 - ✅ Session 3 — Buzz engine + heat-map overlay
-- 🔲 Session 4 — ParticleContainer crowd → MANDATORY STOP 2 (user playtest)
+- ✅ Session 4 — ParticleContainer crowd. **🛑 MANDATORY STOP 2 — awaiting user playtest sign-off before Session 5.**
 - 🔲 Session 5 — Showtime rhythm
 - 🔲 Session 6 — Reintegrate Theatre layer (cast/rehearsal/events/Tony as modal)
 - 🔲 Session 7 — Reactive texture (litter, staff, amenity upgrades)
@@ -107,6 +107,7 @@ If implementation reveals a design issue, do NOT change the GDD. Instead:
 - **2026-05-27:** Theatre District pivot. Session 0 audit + architecture approved (LOW reuse cost, PerformanceSystem input refactor in-scope, slice composition adopted). Session 1 complete: salvaged iso renderer primitives from abandoned Phase A-D multi-floor work onto new `feature/theatre-district` branch off main; added street slice + `StreetState` types + save v3 (additive, Float32Array round-trip); rendered placeholder street smoke-verified. Pre-Theatre-District multi-floor snapshot preserved on `archive/session-1-multifloor`.
 - **2026-05-27:** Session 2 — direct placement & street builder. BUILDING_DEFINITIONS + DECORATION_DEFINITIONS data file with cost/footprint/build days. Slice actions: placeBuilding/placeDecoration/removeBuilding/removeDecoration with full validation (bounds + ownership + no-overlap + can-afford) and cash deduction; acquirePlot now enforces adjacency + cost. BuildingSprite + DecorationSprite procedural classes (Kenney sprite swap is later — same constructor API). StreetView composer with additive Map&lt;id, sprite&gt; diff + ghost preview overlay. Render2Canvas pointer wiring for place/acquire/select. StreetBuildPanel UI gates legacy BuildPanel when USE_RENDER2=true. Smoke verified: $500k → $375.6k after placing 3 buildings + 6 decor + 1 plot; overlap rejected; bounds expanded; zero console errors.
 - **2026-05-27:** Session 3 — Buzz engine + heat-map overlay (LOCKED spec, verbatim). BuzzSystem.computeBuzz pure function: Chebyshev 3-ring linear falloff, building anchors full-strength (theatre 8, restaurant 4, cart 2; unfinished don't emit), decoration per-tile diminishing-returns sort (k=0.6), litter negative emission. withRecomputedBuzz helper wraps every mutating action in streetSlice. BuzzOverlay class (single Graphics, gold↔filament for positive / coal↔ink for negative). Toggle in StreetBuildPanel "View" section. Math hand-verified across 7 sample tiles (theatre center 9.40, far corner 2.25, exact agreement). Visual gradient confirmed in browser. Zero console errors.
+- **2026-05-27:** Session 4 — ParticleContainer crowd. CrowdSystem singleton outside Zustand (lives there because crowd ticks 60×/sec and never persists). SoA typed arrays: posX/Y, velX/Y, target, state, wallet (cents/Int32), mood, spendTicks, ticksAlive, active+freelist. Max 300 agents. Buzz-gradient pathfinding (Chebyshev neighbor sample with noise; greedy not A*). Spawn at owned edge tiles with rate proportional to total positive buzz. Wallet $10–$30 in cents. Per-kind spend: theatre $5/restaurant $3/cart $2 with N-tick spending lock. Mood bumps on spend; floor triggers LEAVING state. CrowdRenderer first PixiJS v8 ParticleContainer use — pre-allocated particle pool, procedural 4×4 white texture, tint per state. Integrated in StreetView; engine ticker drives tickCrowd + sync. Smoke verified: 5,401 amenity txns + $18.7k revenue in test window, agents visibly stream from edge toward theatre, zero console errors. **STOPPED at MANDATORY STOP 2 — awaiting Dixon's playtest sign-off; spawn rate possibly too brisk + agents walk through buildings, both flagged for tuning.**
 
 ## Dev Server
 - Command: `npm run dev`

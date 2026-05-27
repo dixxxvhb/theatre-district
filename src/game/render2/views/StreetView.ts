@@ -16,6 +16,7 @@ import { TileLayer, type GridBounds } from '../tiles/TileLayer';
 import { BuildingSprite } from '../entities/BuildingSprite';
 import { DecorationSprite } from '../entities/DecorationSprite';
 import { BuzzOverlay } from './BuzzOverlay';
+import { CrowdRenderer } from './CrowdRenderer';
 
 export interface StreetViewInputs {
   bounds: GridBounds;
@@ -41,6 +42,7 @@ export class StreetView {
   readonly container = new Container();
   readonly tileLayer: TileLayer;
   readonly buzzOverlay: BuzzOverlay;
+  readonly crowdRenderer: CrowdRenderer;
   private buildingSprites = new Map<string, BuildingSprite>();
   private decorationSprites = new Map<string, DecorationSprite>();
   private ghostGraphics = new Graphics();
@@ -52,6 +54,8 @@ export class StreetView {
     this.container.addChild(this.tileLayer.container);
     this.buzzOverlay = new BuzzOverlay();
     this.container.addChild(this.buzzOverlay.container);
+    this.crowdRenderer = new CrowdRenderer();
+    this.container.addChild(this.crowdRenderer.container);
 
     this.ghostGraphics.zIndex = LAYER.UI_OVERLAY + 5; // above buzz overlay
     this.container.addChild(this.ghostGraphics);
@@ -165,6 +169,7 @@ export class StreetView {
     this.decorationSprites.clear();
     this.ghostGraphics.destroy();
     this.buzzOverlay.destroy();
+    this.crowdRenderer.destroy();
     this.container.destroy();
   }
 }

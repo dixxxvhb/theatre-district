@@ -11,6 +11,7 @@ import {
   BUILDING_DEFINITIONS,
   DECORATION_DEFINITIONS,
 } from '../data/street';
+import { tickCrowd, resetCrowd } from '../systems/CrowdSystem';
 import type { BuildingKind, DecorationKind } from '../../types';
 
 export function Render2Canvas() {
@@ -45,15 +46,21 @@ export function Render2Canvas() {
 
     engine.init(containerRef.current, {
       onCameraUpdate: (x, y, zoom) => setCamera(x, y, zoom),
-      onTick: () => {
+      onTick: (dtMS) => {
         const v = viewRef.current;
         if (!v) return;
         v.setHover(hoveredRef.current);
         v.setGhost(computeGhost(hoveredRef.current));
+        // Crowd: simulate + render. Per-frame; no Zustand thrash because
+        // crowd state lives outside the store.
+        tickCrowd(dtMS);
+        v.crowdRenderer.sync();
       },
     }).then(() => {
-      if (!engine.worldContainer) return;
+      if (!engine.worldContainer || !engine.app) return;
       engine.worldContainer.addChild(view.container);
+      view.crowdRenderer.init(engine.app);
+      resetCrowd();
       paintAll();
       recenterCamera();
 
