@@ -304,6 +304,8 @@ export interface UIState {
   streetSelectedId: string | null;
   /** Theatre District: show the buzz heat-map overlay. */
   showBuzzOverlay: boolean;
+  /** Theatre District: TheatreModal is open for the currently selected theatre. */
+  theatreModalOpen: boolean;
 }
 
 export interface Notification {
@@ -476,6 +478,17 @@ export interface StreetPlot {
   acquiredDay: number;
 }
 
+export interface PerformanceSummary {
+  day: number;
+  showName: string;
+  capacity: number;
+  attendance: number;
+  fillFactor: number;     // 0..1
+  revenue: number;        // dollars
+  quality: number;        // 0..100, derived from hit roll
+  popularityDelta: number; // change applied to building.popularity
+}
+
 export interface PlacedBuilding {
   id: string;
   kind: BuildingKind;
@@ -483,7 +496,12 @@ export interface PlacedBuilding {
   footprint: Size;
   constructedDay: number;
   constructionDaysLeft: number;
-  theatreId?: string; // for kind='theatre', links to the Theatre layer entity
+  theatreId?: string;          // for kind='theatre', links to the Theatre layer entity
+  /** Theatre-only: buzz emission multiplier driven by recent performance hits.
+   * 1.0 = baseline, >1 = hit theatre crowds, <1 = flop dampens crowd. Range 0.4..1.8. */
+  popularity?: number;
+  /** Last performance result, shown in TheatreModal. */
+  lastPerformance?: PerformanceSummary;
 }
 
 export interface PlacedDecoration {

@@ -30,6 +30,9 @@ import {
   plotAcquisitionCost,
 } from '../../game/data/street';
 import { withRecomputedBuzz } from '../../game/systems/BuzzSystem';
+import { computeTheatreStats } from '../../game/systems/TheatreStats';
+import { runPerformance } from '../../game/systems/TheatrePerformance';
+import type { PerformanceSummary } from '../../types';
 
 const STARTING_BOUNDS: StreetBounds = { minX: 0, maxX: 7, minY: 0, maxY: 2 };
 
@@ -92,6 +95,13 @@ export interface StreetSlice {
 
   /** Toggle the buzz heat-map overlay. */
   toggleBuzzOverlay: () => void;
+
+  /** Run a performance on a specific theatre. Credits revenue + updates popularity. */
+  runTheatrePerformance: (buildingId: string) => PerformanceSummary | null;
+
+  /** Open / close the theatre modal for the currently selected theatre. */
+  openTheatreModal: () => void;
+  closeTheatreModal: () => void;
 }
 
 /** State keys this slice owns. Concatenated into the root persist-keys array. */
@@ -317,5 +327,40 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
 
   toggleBuzzOverlay: () => set((state) => ({
     ui: { ...state.ui, showBuzzOverlay: !state.ui.showBuzzOverlay },
+  })),
+
+  runTheatrePerformance: (buildingId) => {
+    const s = get();
+    const building = s.street.placedBuildings.find((b) => b.id === buildingId);
+    if (!building || building.kind !== 'theatre' || building.constructionDaysLeft > 0) return null;
+    const stats = computeTheatreStats(building, s.street);
+    const { summary, newPopularity } = runPerformance(building, stats, s.time.day);
+
+    // Credit revenue to economy
+    if (summary.revenue > 0) {
+      s.addCash(summary.revenue, 'box-office', `${building.kind} performance: ${summary.showName}`);
+    }
+
+    // Persist popularity + lastPerformance on the building; recompute buzz
+    // (popularity feeds the theatre emission multiplier).
+    set((state) => ({
+      street: withRecomputedBuzz({
+        ...state.street,
+        placedBuildings: state.street.placedBuildings.map((b) =>
+          b.id === buildingId
+            ? { ...b, popularity: newPopularity, lastPerformance: summary }
+            : b,
+        ),
+      }),
+    }));
+    return summary;
+  },
+
+  openTheatreModal: () => set((state) => ({
+    ui: { ...state.ui, theatreModalOpen: true },
+  })),
+
+  closeTheatreModal: () => set((state) => ({
+    ui: { ...state.ui, theatreModalOpen: false },
   })),
 });

@@ -23,6 +23,7 @@ export function StreetBuildPanel() {
   const selectStreetEntity = useGameStore((s) => s.selectStreetEntity);
   const showBuzzOverlay = useGameStore((s) => s.ui.showBuzzOverlay);
   const toggleBuzzOverlay = useGameStore((s) => s.toggleBuzzOverlay);
+  const openTheatreModal = useGameStore((s) => s.openTheatreModal);
 
   const plotCost = plotAcquisitionCost(street.plots.length);
   const selectedBuilding = streetSelectedId
@@ -57,6 +58,14 @@ export function StreetBuildPanel() {
                   ? `Building (${selectedBuilding.constructionDaysLeft}d left)`
                   : 'Open'}
               </div>
+              {selectedBuilding.kind === 'theatre' && selectedBuilding.constructionDaysLeft === 0 && (
+                <button
+                  onClick={openTheatreModal}
+                  className="mt-3 w-full px-3 py-2 bg-amber-700/40 hover:bg-amber-700/60 border border-amber-600/60 text-amber-100 rounded text-sm font-medium transition-colors"
+                >
+                  Enter Theatre
+                </button>
+              )}
               <button
                 onClick={() => { removeBuilding(selectedBuilding.id); selectStreetEntity(null); }}
                 className="mt-3 text-xs text-rose-400 hover:text-rose-300 underline"

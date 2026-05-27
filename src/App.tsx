@@ -5,6 +5,7 @@ import { MainMenu } from './ui/layouts/MainMenu';
 import { PropertySelect } from './ui/layouts/PropertySelect';
 import { BuildPanel } from './ui/panels/BuildPanel';
 import { StreetBuildPanel } from './ui/panels/StreetBuildPanel';
+import { TheatreModal } from './ui/modals/TheatreModal';
 import { USE_RENDER2 } from './game/data/constants';
 import { StaffPanel } from './ui/panels/StaffPanel';
 import { RehearsalView } from './ui/panels/RehearsalView';
@@ -561,6 +562,7 @@ function App() {
           </div>
           {USE_RENDER2 ? <StreetBuildPanel /> : <BuildPanel />}
         </div>
+        {USE_RENDER2 && <TheatreModalGate />}
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}
         <GameOverModal />
@@ -688,6 +690,15 @@ function App() {
       <NotificationToast />
     </div>
   );
+}
+
+// Gate: render TheatreModal only when ui.theatreModalOpen is set and the
+// selected entity is still a theatre on the street.
+function TheatreModalGate() {
+  const open = useGameStore((s) => s.ui.theatreModalOpen);
+  const closeTheatreModal = useGameStore((s) => s.closeTheatreModal);
+  if (!open) return null;
+  return <TheatreModal onClose={closeTheatreModal} />;
 }
 
 export default App;

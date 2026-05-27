@@ -72,6 +72,7 @@ const initialState: GameState = {
     streetTool: null,
     streetSelectedId: null,
     showBuzzOverlay: false,
+    theatreModalOpen: false,
   },
 
   properties: [],

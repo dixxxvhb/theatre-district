@@ -64,11 +64,13 @@ export function computeBuzz(street: StreetState): Float32Array {
   };
 
   // --- 1. Buildings: full strength, no diminishing ---
+  // Theatres also multiply by popularity (boosted by hits, dampened by flops).
   for (const b of street.placedBuildings) {
     if (b.constructionDaysLeft > 0) continue; // unfinished doesn't emit yet
     const base = BUILDING_BUZZ[b.kind];
     if (!base) continue;
-    spreadFrom(field, tileIndex, b.position.x, b.position.y, base, 1);
+    const popMult = b.kind === 'theatre' ? (b.popularity ?? 1.0) : 1.0;
+    spreadFrom(field, tileIndex, b.position.x, b.position.y, base * popMult, 1);
   }
 
   // --- 2. Decoration: per-tile diminishing-returns pool ---
