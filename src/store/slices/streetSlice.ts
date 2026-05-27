@@ -18,7 +18,17 @@ import type {
   StreetState,
   StreetBounds,
   StreetPlot,
+  BuildingKind,
+  DecorationKind,
+  Position,
+  StreetTool,
 } from '../../types';
+import type { GameActions } from '../gameStore';
+import {
+  BUILDING_DEFINITIONS,
+  DECORATION_DEFINITIONS,
+  plotAcquisitionCost,
+} from '../../game/data/street';
 
 const STARTING_BOUNDS: StreetBounds = { minX: 0, maxX: 7, minY: 0, maxY: 2 };
 
@@ -45,27 +55,122 @@ export function createEmptyStreet(): StreetState {
   };
 }
 
+/** Uniform result type for placement / acquisition actions. */
+export type PlacementResult =
+  | { ok: true }
+  | { ok: false; reason: string };
+
 /** Slice surface: state + actions the street layer contributes to the root store. */
 export interface StreetSlice {
   street: StreetState;
-  /** Add a single plot tile. Expands bounds if needed; preserves existing buzz values. */
-  acquirePlot: (x: number, y: number, currentDay: number) => boolean;
+
+  /** Acquire a single plot tile. Must be adjacent to an existing owned plot. Deducts plot cost. */
+  acquirePlot: (x: number, y: number, currentDay: number) => PlacementResult;
+
+  /** Place a building (footprint check, ownership check, no overlap, cost). */
+  placeBuilding: (kind: BuildingKind, position: Position, currentDay: number) => PlacementResult;
+
+  /** Place a decoration item (single tile, ownership check, no overlap, cost). */
+  placeDecoration: (kind: DecorationKind, position: Position, currentDay: number) => PlacementResult;
+
+  /** Remove a placed building by id. No refund. */
+  removeBuilding: (id: string) => void;
+
+  /** Remove a placed decoration item by id. No refund. */
+  removeDecoration: (id: string) => void;
+
   /** Reset to the starting street (used on new game). */
   resetStreet: () => void;
+
+  /** Select a placement tool (building, decoration, or acquire-plot mode). */
+  setStreetTool: (tool: StreetTool | null) => void;
+
+  /** Select a placed building or decoration by id. Null to deselect. */
+  selectStreetEntity: (id: string | null) => void;
 }
 
 /** State keys this slice owns. Concatenated into the root persist-keys array. */
 export const STREET_PERSIST_KEYS = ['street'] as const satisfies ReadonlyArray<keyof GameState>;
 
-type RootStateForSlice = StreetSlice & { street: StreetState };
+type RootForStreet = GameState & GameActions & StreetSlice;
 
-export const createStreetSlice: StateCreator<RootStateForSlice, [], [], StreetSlice> = (set, get) => ({
+// ============================================================
+// Internal helpers — pure functions on street state
+// ============================================================
+
+const tileKey = (x: number, y: number) => `${x},${y}`;
+
+function inBounds(b: StreetBounds, x: number, y: number): boolean {
+  return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
+}
+
+function ownedTileSet(plots: StreetPlot[]): Set<string> {
+  return new Set(plots.map((p) => tileKey(p.x, p.y)));
+}
+
+/** All tiles currently occupied by any placed building or decoration. */
+function occupiedTileSet(street: StreetState): Set<string> {
+  const out = new Set<string>();
+  for (const b of street.placedBuildings) {
+    const def = BUILDING_DEFINITIONS[b.kind];
+    for (let dy = 0; dy < def.footprint.height; dy++) {
+      for (let dx = 0; dx < def.footprint.width; dx++) {
+        out.add(tileKey(b.position.x + dx, b.position.y + dy));
+      }
+    }
+  }
+  for (const d of street.decoration) {
+    out.add(tileKey(d.position.x, d.position.y));
+  }
+  return out;
+}
+
+/** Footprint cells of a building anchored at position. */
+function footprintCells(position: Position, w: number, h: number): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      out.push([position.x + dx, position.y + dy]);
+    }
+  }
+  return out;
+}
+
+function isAdjacentToOwned(plots: StreetPlot[], x: number, y: number): boolean {
+  const set = ownedTileSet(plots);
+  return (
+    set.has(tileKey(x - 1, y)) ||
+    set.has(tileKey(x + 1, y)) ||
+    set.has(tileKey(x, y - 1)) ||
+    set.has(tileKey(x, y + 1))
+  );
+}
+
+function newId(prefix: string): string {
+  // crypto.randomUUID is standard in modern browsers + Node 19+.
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+// ============================================================
+// Slice
+// ============================================================
+
+export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice> = (set, get) => ({
   street: createEmptyStreet(),
 
   acquirePlot: (x, y, currentDay) => {
     const s = get();
-    const exists = s.street.plots.some((p) => p.x === x && p.y === y);
-    if (exists) return false;
+    if (s.street.plots.some((p) => p.x === x && p.y === y)) {
+      return { ok: false, reason: 'Already owned' };
+    }
+    if (!isAdjacentToOwned(s.street.plots, x, y)) {
+      return { ok: false, reason: 'Plot must touch your street' };
+    }
+    const cost = plotAcquisitionCost(s.street.plots.length);
+    if (s.economy.cash < cost) {
+      return { ok: false, reason: 'Not enough cash' };
+    }
+    s.removeCash(cost, 'plot', `Acquired plot (${x}, ${y})`);
     set((state) => {
       const newPlots = [...state.street.plots, { x, y, acquiredDay: currentDay }];
       const newBounds: StreetBounds = {
@@ -98,8 +203,116 @@ export const createStreetSlice: StateCreator<RootStateForSlice, [], [], StreetSl
         },
       };
     });
-    return true;
+    return { ok: true };
+  },
+
+  placeBuilding: (kind, position, currentDay) => {
+    const def = BUILDING_DEFINITIONS[kind];
+    if (!def) return { ok: false, reason: 'Unknown building kind' };
+    const s = get();
+    const cells = footprintCells(position, def.footprint.width, def.footprint.height);
+
+    for (const [cx, cy] of cells) {
+      if (!inBounds(s.street.bounds, cx, cy)) {
+        return { ok: false, reason: 'Out of bounds' };
+      }
+    }
+    const owned = ownedTileSet(s.street.plots);
+    for (const [cx, cy] of cells) {
+      if (!owned.has(tileKey(cx, cy))) {
+        return { ok: false, reason: 'Not all tiles owned' };
+      }
+    }
+    const occupied = occupiedTileSet(s.street);
+    for (const [cx, cy] of cells) {
+      if (occupied.has(tileKey(cx, cy))) {
+        return { ok: false, reason: 'Tile occupied' };
+      }
+    }
+    if (s.economy.cash < def.cost) {
+      return { ok: false, reason: 'Not enough cash' };
+    }
+    s.removeCash(def.cost, 'construction', `Built ${def.label}`);
+    set((state) => ({
+      street: {
+        ...state.street,
+        placedBuildings: [
+          ...state.street.placedBuildings,
+          {
+            id: newId('bld'),
+            kind,
+            position,
+            footprint: def.footprint,
+            constructedDay: currentDay,
+            constructionDaysLeft: def.buildDays,
+          },
+        ],
+      },
+    }));
+    return { ok: true };
+  },
+
+  placeDecoration: (kind, position, currentDay) => {
+    const def = DECORATION_DEFINITIONS[kind];
+    if (!def) return { ok: false, reason: 'Unknown decoration kind' };
+    const s = get();
+    if (!inBounds(s.street.bounds, position.x, position.y)) {
+      return { ok: false, reason: 'Out of bounds' };
+    }
+    const owned = ownedTileSet(s.street.plots);
+    if (!owned.has(tileKey(position.x, position.y))) {
+      return { ok: false, reason: 'Tile not owned' };
+    }
+    const occupied = occupiedTileSet(s.street);
+    if (occupied.has(tileKey(position.x, position.y))) {
+      return { ok: false, reason: 'Tile occupied' };
+    }
+    if (s.economy.cash < def.cost) {
+      return { ok: false, reason: 'Not enough cash' };
+    }
+    s.removeCash(def.cost, 'decoration', `Placed ${def.label}`);
+    set((state) => ({
+      street: {
+        ...state.street,
+        decoration: [
+          ...state.street.decoration,
+          {
+            id: newId('dec'),
+            kind,
+            position,
+            placedDay: currentDay,
+          },
+        ],
+      },
+    }));
+    return { ok: true };
+  },
+
+  removeBuilding: (id) => {
+    set((state) => ({
+      street: {
+        ...state.street,
+        placedBuildings: state.street.placedBuildings.filter((b) => b.id !== id),
+      },
+    }));
+  },
+
+  removeDecoration: (id) => {
+    set((state) => ({
+      street: {
+        ...state.street,
+        decoration: state.street.decoration.filter((d) => d.id !== id),
+      },
+    }));
   },
 
   resetStreet: () => set({ street: createEmptyStreet() }),
+
+  setStreetTool: (tool) => set((state) => ({
+    ui: { ...state.ui, streetTool: tool, streetSelectedId: null },
+  })),
+
+  selectStreetEntity: (id) => set((state) => ({
+    ui: { ...state.ui, streetSelectedId: id, streetTool: null },
+  })),
 });

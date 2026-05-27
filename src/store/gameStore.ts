@@ -69,6 +69,8 @@ const initialState: GameState = {
     activePanel: null,
     notifications: [],
     isRenovating: false,
+    streetTool: null,
+    streetSelectedId: null,
   },
 
   properties: [],
@@ -121,7 +123,7 @@ const initialState: GameState = {
   street: createEmptyStreet(),
 };
 
-interface GameActions {
+export interface GameActions {
   // Game lifecycle
   initGame: (theaterName: string) => void;
   resetGame: () => void;

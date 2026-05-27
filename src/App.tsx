@@ -4,6 +4,8 @@ import { GameCanvas } from './game/canvas/GameCanvas';
 import { MainMenu } from './ui/layouts/MainMenu';
 import { PropertySelect } from './ui/layouts/PropertySelect';
 import { BuildPanel } from './ui/panels/BuildPanel';
+import { StreetBuildPanel } from './ui/panels/StreetBuildPanel';
+import { USE_RENDER2 } from './game/data/constants';
 import { StaffPanel } from './ui/panels/StaffPanel';
 import { RehearsalView } from './ui/panels/RehearsalView';
 import { ShowPickerModal } from './ui/modals/ShowPickerModal';
@@ -557,7 +559,7 @@ function App() {
             <GameCanvas />
             <TileInfo />
           </div>
-          <BuildPanel />
+          {USE_RENDER2 ? <StreetBuildPanel /> : <BuildPanel />}
         </div>
         {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
         {showTransition && <PhaseTransitionOverlay />}

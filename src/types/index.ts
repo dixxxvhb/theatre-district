@@ -286,6 +286,9 @@ export interface ReputationState {
   milestones: string[];
 }
 
+/** Street-layer placement tool selection. Flat union — disjoint kinds. */
+export type StreetTool = BuildingKind | DecorationKind | 'acquire';
+
 export interface UIState {
   currentPhase: GamePhase;
   viewMode: ViewMode;
@@ -295,6 +298,10 @@ export interface UIState {
   activePanel: string | null;
   notifications: Notification[];
   isRenovating: boolean;
+  /** Theatre District: which tool the player has selected for street placement. */
+  streetTool: StreetTool | null;
+  /** Theatre District: currently selected placed building/decoration id. */
+  streetSelectedId: string | null;
 }
 
 export interface Notification {
