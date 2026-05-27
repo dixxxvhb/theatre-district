@@ -332,9 +332,22 @@ export function GameCanvas() {
         if (isDraggingRoomRef.current && dragStartRef.current && store.ui.selectedRoomType) {
           isDraggingRoomRef.current = false;
 
-          const cell = screenToCell(e);
-          if (cell) {
-            hoveredCellRef.current = cell;
+          const endCell = screenToCell(e);
+          if (endCell) {
+            hoveredCellRef.current = endCell;
+          }
+
+          // Click-to-place: pointerdown and pointerup landed on the same cell.
+          // Use the room's defaultSize anchored at that cell.
+          const start = dragStartRef.current;
+          const isClick = endCell && start.x === endCell.x && start.y === endCell.y;
+          if (isClick) {
+            const roomDef = ROOM_DEFINITIONS[store.ui.selectedRoomType];
+            if (roomDef) {
+              store.placeRoom(store.ui.selectedRoomType, start, roomDef.defaultSize);
+            }
+            dragStartRef.current = null;
+            return;
           }
 
           const rect = getPlacementRect();
