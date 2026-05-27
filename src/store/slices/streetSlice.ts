@@ -32,7 +32,10 @@ import {
 import { withRecomputedBuzz } from '../../game/systems/BuzzSystem';
 import { computeTheatreStats } from '../../game/systems/TheatreStats';
 import { runPerformance } from '../../game/systems/TheatrePerformance';
-import type { PerformanceSummary } from '../../types';
+import { generateShow } from '../../game/data/shows';
+import { generateCastCandidate } from '../../game/data/staff';
+import { advanceRehearsal } from '../../game/systems/RehearsalSystem';
+import type { PerformanceSummary, Show, CastMember } from '../../types';
 
 const STARTING_BOUNDS: StreetBounds = { minX: 0, maxX: 7, minY: 0, maxY: 2 };
 
@@ -108,6 +111,21 @@ export interface StreetSlice {
 
   /** Toggle the street sweeper hire. Daily cost ticked by TimeSystem. */
   toggleSweeper: () => void;
+
+  // ============================================================
+  // Theatre show production pipeline (legacy reuse)
+  // ============================================================
+
+  /** Generate 3 show options for the player to pick from. */
+  commissionShowOptions: () => Show[];
+  /** Commit one of the show options. Sets activeShowId. */
+  commitShow: (showId: string) => void;
+  /** Generate 3 cast candidates for a given role. */
+  auditionForRole: (showId: string, roleId: string) => CastMember[];
+  /** Advance the rehearsal by one day (wraps RehearsalSystem.advanceRehearsal). */
+  advanceTheatreRehearsal: (showId: string) => { progress: number; eventMessage: string | null };
+  /** Close the show; final popularity update for the host theatre. */
+  closeTheatreShow: (showId: string, theatreId: string) => void;
 }
 
 /** State keys this slice owns. Concatenated into the root persist-keys array. */
@@ -395,6 +413,69 @@ export const createStreetSlice: StateCreator<RootForStreet, [], [], StreetSlice>
   toggleSweeper: () => set((state) => ({
     ui: { ...state.ui, sweeperHired: !state.ui.sweeperHired },
   })),
+
+  commissionShowOptions: () => {
+    const options = [generateShow(), generateShow(), generateShow()];
+    get().setShowOptions(options);
+    return options;
+  },
+
+  commitShow: (showId) => {
+    // selectShow already exists; it sets activeShowId and copies the chosen
+    // option into shows[] for downstream tracking.
+    get().selectShow(showId);
+  },
+
+  auditionForRole: (_showId, _roleId) => {
+    return [generateCastCandidate(), generateCastCandidate(), generateCastCandidate()];
+  },
+
+  advanceTheatreRehearsal: (showId) => {
+    const s = get();
+    const show = s.shows.find((sh) => sh.id === showId);
+    if (!show) return { progress: 0, eventMessage: null };
+    // For Theatre District we treat the theatre itself as the rehearsal space —
+    // no per-room rehearsal hall lookup. Pass false/false (slowest baseline).
+    // When per-theatre tier=2 buildings exist, treat as upgraded hall.
+    const hostTheatre = s.street.placedBuildings.find((b) => b.kind === 'theatre' && b.constructionDaysLeft === 0);
+    const isUpgraded = (hostTheatre?.tier ?? 1) === 2;
+    const { updatedShow, event } = advanceRehearsal(show, true, isUpgraded, s.time.day);
+    s.updateShow(showId, updatedShow);
+    if (event) {
+      s.addRehearsalLog?.({
+        id: event.id,
+        day: event.day,
+        type: event.type,
+        message: event.message,
+      });
+    }
+    return { progress: updatedShow.rehearsalProgress, eventMessage: event?.message ?? null };
+  },
+
+  closeTheatreShow: (showId, theatreId) => {
+    const s = get();
+    const show = s.shows.find((sh) => sh.id === showId);
+    if (!show) return;
+    // Derive a final popularity bump from average attendance + critic score
+    const attendanceFactor = show.averageAttendance ? show.averageAttendance / 100 : 0;
+    const criticFactor = show.criticScore ? show.criticScore / 100 : 0.5;
+    const finalDelta = (attendanceFactor + criticFactor - 1.0) * 0.3; // -0.3 .. +0.3
+    set((state) => ({
+      street: withRecomputedBuzz({
+        ...state.street,
+        placedBuildings: state.street.placedBuildings.map((b) =>
+          b.id === theatreId
+            ? { ...b, popularity: Math.max(0.4, Math.min(1.8, (b.popularity ?? 1.0) + finalDelta)) }
+            : b,
+        ),
+      }),
+    }));
+    // Mark show closed
+    s.updateShow(showId, {
+      isRunning: false,
+      closingNight: s.time.day,
+    });
+  },
 });
 
 /** Upgrade cost per building kind. */
