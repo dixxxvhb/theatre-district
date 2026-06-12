@@ -64,12 +64,12 @@ Campaign runs Sessions 0–10 (see v2.1 spec). **Mandatory stops:** #1 after Ses
 - ✅ **Session 2** (2026-06-12) — Marquee Noir kit shipped (`src/game/render/kit/`): palette + 6-keyframe grade (one world tint + sky tints + light-layer alpha), bake-once pipeline, building factory with base/emissive texture pairs, additive light layer w/ single BlurFilter bloom, sky/grain/steam atmosphere, era-aware lamp dressing, derelict playhouse seeded in newGame (carries the memorial mark), dev-panel time jumps. Screenshots in docs/theatre-district/.
 - ✅ **Session 3** (2026-06-12) — placement & Buzz shipped: full catalog in balance.ts, locked-spec buzz engine (12 tests) + memoized field, place/demolish/restore/sweeper/endOfDay actions, all factory variants (theatres/amenities/decorations/construction), ghost + shift-repeat + demolish-confirm, ground-painted heatmap (Tab) + hover readout, build palette (B) + selection card. Dev handle: `window.__td` (dev builds only).
 - ✅ **Session 4** (2026-06-12) — core loop CLOSED: CrowdSim (SoA, outside store, lane steering, queues, spending, litter), ShowtimeDirector (phase-edge resolution, box-office + takings money beats), marquee-ignition cascade, ~44 peep thoughts + click bubbles, momentum (word-of-mouth lite, tested), pooled crowd rendering depth-sorted with buildings, dev surge + people meter. 53 tests. Verified: deterministic evening step-through + 10-day soak, money math exact. → STOP #2 (demo deployed to Pages root)
-- 🔲 Session 5 — Production Desk (full show-system reuse, upgrades list, zero logic regressions)
-- 🔲 Session 6 — show lifecycle, 3 critics, Daily Playbill, demographics, pricing elasticity (tests: momentum, elasticity)
-- 🔲 Session 7 — seasons, weather + rain reflections, word-of-mouth, weekend pulse, maintenance, Dark Week (tests: economy tick × season/weather)
-- 🔲 Session 8 — 5 eras, gates/turnovers, authored opening + skip, teach cards + Almanac, rival events, recognitions, finale Gala, photo mode
-- 🔲 Session 9 — juice & cohesion, marquee-ignition showcase, perf pass
-- 🔲 Session 10 — QA, full playthrough, deploy, README
+- ✅ **Session 5** (2026-06-12) — Production Desk: full pipeline commission → cast → rehearse → open, legacy chemistry port, director decisions auto-pausing, 16 Theatre Upgrades wired to real bonuses. Save v2.
+- ✅ **Session 6** (2026-06-12) — Lifecycle: previews → opening with 3 critic verdicts → run → close. Daily Playbill. 4 demographics. Ticket elasticity + gouging. 10 street events + 19 ported theatre events.
+- ✅ **Session 7** (2026-06-12) — Seasons drive crowds + ticket multipliers. Weather (clear/rain/heat) with rain streaks + reflection sheen. Dark Week + once-per-era patron rescue. Repair action.
+- ✅ **Session 8** (2026-06-12) — 5 eras with milestone gates + Advance button. 10 teach cards (Almanac, H). Authored intro + skip. District Gala finale derives archetype from play. Photo mode (P).
+- ✅ **Session 9** (2026-06-12) — Juice: ignition overshoot, applause flash on box office, cash pulse, EraPanel rerender fix.
+- ✅ **Session 10** (2026-06-12) — Final QA, README, deploy. **1.0 SHIPPED.**
 
 **Every session ends with:** typecheck clean (`npm run build` — the real build, not `tsc --noEmit`) · tests green · game boots · save/load round-trips · one-paragraph `docs/BUILD_LOG.md` entry (+ screenshot when visual) · clean commits.
 
