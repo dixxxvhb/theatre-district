@@ -19,8 +19,10 @@ These arrived pre-decided in the v2.1 prompt and are recorded for the trail:
 - **World numbers locked** — street growth 20→64, day ≈ 90s at 1x, pacing targets, 1280×720 floor, desktop-first.
 - **Memorial mark** — two overlapping outlined gold circles, quiet and permanent, no UI attached.
 
-## 2026-06-12 — Open questions for STOP #1 (awaiting Dixon)
+## 2026-06-12 — STOP #1 answers (Dixon)
 
-1. **Prior pivot attempt** (`feature/theatre-district`, live at `/v3/`): treat as salvage quarry and build v2.1 fresh from `main` (recommended), or build on top of it?
-2. **Deploy address at 1.0**: keep `dixxxvhb.github.io/broadway-tycoon/` with Theatre District at the root and the old game moved to `/classic/` (default), or rename the GitHub repo to `theatre-district` for a clean URL (old links break)?
-3. **The `/v3/` prototype deploy**: take it down when the Stop #2 demo deploys, or leave it up?
+1. **Prior pivot attempt** (`feature/theatre-district`): **salvage quarry confirmed.** Build v2.1 fresh from `main`; lift only spec-compliant pieces (Buzz numerics, crowd data layout, iso math). Never build on top of it.
+2. **Deploy address**: **rename everywhere.** GitHub repo `dixxxvhb/broadway-tycoon` → `dixxxvhb/theatre-district`; Pages URL becomes `dixxxvhb.github.io/theatre-district/`. Old game preserved at `/classic/` (rebuilt for the new base path since the rename breaks its asset paths anyway). Local checkout renamed to `~/Code/theatre-district`.
+3. **The `/v3/` prototype deploy**: **taken down** (removed during the rename — the URL change broke it regardless; the branch and the `broadway-tycoon-v2` checkout remain as the salvage quarry).
+
+**Why it matters:** clean identity for the new game, old game stays playable at a stable sub-path, and there's exactly one deployed Theatre District (the v2.1 one, from Stop #2 onward).

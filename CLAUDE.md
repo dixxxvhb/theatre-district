@@ -80,9 +80,9 @@ Campaign runs Sessions 0–10 (see v2.1 spec). **Mandatory stops:** #1 after Ses
 60fps mid-tier laptop, full street, 150+ agents (cull off-screen, pool particles/agents, baked textures). Load < 3MB.
 
 ## Repo Layout
-- This checkout (`~/Code/broadway-tycoon`): branch `theatre-district` — ALL v2.1 work here. Merge to main + deploy at Stop #2 and Session 10. Commit per coherent change, no monoliths.
+- This checkout (`~/Code/theatre-district`): branch `theatre-district` — ALL v2.1 work here. GitHub repo: `dixxxvhb/theatre-district` (renamed from `broadway-tycoon` at Stop #1). Merge to main + deploy at Stop #2 and Session 10. Commit per coherent change, no monoliths.
 - `~/Code/broadway-tycoon-v2`: second checkout of the same repo, on old branch `feature/theatre-district` — the superseded prior pivot attempt (salvage quarry, see audit §2). Read from it; don't work in it.
-- Live: `dixxxvhb.github.io/broadway-tycoon/` (BT v2.1.0) and `/v3/` (prior attempt). Deploy plan decided at Stop #1/#2.
+- Live: `dixxxvhb.github.io/theatre-district/` — root gets the TD demo at Stop #2 (placeholder until then); old Broadway Tycoon preserved playable at `/classic/`; the prior-attempt `/v3/` deploy was removed at Stop #1 (Dixon's call).
 
 ## File Map (target shape — Session 1 establishes)
 ```
