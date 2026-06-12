@@ -31,6 +31,8 @@ export interface TextureKit {
   grain: Texture;
   /** Soft particle dot (steam, dust). */
   particle: Texture;
+  /** Litter scatter for a tile. */
+  litter: Texture;
 }
 
 /** Deterministic per-position hash for variant picking. */
@@ -156,6 +158,17 @@ export function bakeTextureKit(baker: Baker): TextureKit {
     ctx.putImageData(img, 0, 0);
   });
 
+  const litter = baker.bake('litter', (g) => {
+    // Crumpled playbills and bottle glints scattered over a half-tile area.
+    for (let i = 0; i < 7; i++) {
+      const px = 6 + hash2(i, 91) * (HW - 12);
+      const py = 4 + hash2(91, i) * (HH - 8);
+      if (i % 3 === 0) g.rect(px, py, 3.5, 2.5).fill({ color: 0x9a937e, alpha: 0.8 });
+      else if (i % 3 === 1) g.circle(px, py, 1.4).fill({ color: 0x6a705e, alpha: 0.8 });
+      else g.rect(px, py, 2.5, 1.5).fill({ color: 0x4a4438, alpha: 0.9 });
+    }
+  });
+
   return {
     asphalt,
     asphaltDash,
@@ -170,6 +183,7 @@ export function bakeTextureKit(baker: Baker): TextureKit {
     skyGradient,
     grain,
     particle,
+    litter,
   };
 }
 

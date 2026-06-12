@@ -97,12 +97,12 @@ function darken(color: number, f: number): number {
 }
 
 function drawShell(g: G, f: Frame, spec: BuildingSpec) {
-  // Right (SE) face — darkest.
-  poly(g, [up(f.E, f.h), up(f.S, f.h), f.S, f.E], darken(spec.wallColor, 0.62));
+  // Right (SE) face — darkest, but never so dark it merges with the night.
+  poly(g, [up(f.E, f.h), up(f.S, f.h), f.S, f.E], darken(spec.wallColor, 0.72));
   // Front (SW) face.
   poly(g, [up(f.W, f.h), up(f.S, f.h), f.S, f.W], spec.wallColor);
   // Roof.
-  poly(g, [up(f.N, f.h), up(f.E, f.h), up(f.S, f.h), up(f.W, f.h)], darken(spec.wallColor, 0.52));
+  poly(g, [up(f.N, f.h), up(f.E, f.h), up(f.S, f.h), up(f.W, f.h)], darken(spec.wallColor, 0.6));
   // Edge definition — silhouette reads even when the grade goes near-black.
   const edge = darken(spec.trimColor, 1.15);
   g.moveTo(up(f.W, f.h)[0], up(f.W, f.h)[1])
@@ -224,10 +224,10 @@ export function bakeBuilding(baker: Baker, spec: BuildingSpec): BuildingBake {
   return { base, emissive, anchorX: f.N[0], anchorY: f.N[1] };
 }
 
-/** The catalog Session 2 needs; later sessions extend per kind/variant. */
+/** The theatre tiers. The inherited playhouse carries the memorial mark. */
 export function bakePlayhouse(baker: Baker, derelict: boolean, memorial = false): BuildingBake {
   return bakeBuilding(baker, {
-    key: derelict ? 'playhouse-derelict' : 'playhouse',
+    key: `playhouse${derelict ? '-derelict' : ''}${memorial ? '-mem' : ''}`,
     w: 3,
     d: 3,
     wallHeight: 150,
@@ -238,4 +238,135 @@ export function bakePlayhouse(baker: Baker, derelict: boolean, memorial = false)
     memorial,
     seed: 7,
   });
+}
+
+export function bakeMidhouse(baker: Baker, derelict: boolean): BuildingBake {
+  return bakeBuilding(baker, {
+    key: `midhouse${derelict ? '-derelict' : ''}`,
+    w: 4,
+    d: 3,
+    wallHeight: 190,
+    wallColor: derelict ? FACADE.brickDark : FACADE.stone,
+    trimColor: FACADE.trim,
+    theatre: true,
+    derelict,
+    seed: 23,
+  });
+}
+
+export function bakeGrand(baker: Baker, derelict: boolean): BuildingBake {
+  return bakeBuilding(baker, {
+    key: `grand${derelict ? '-derelict' : ''}`,
+    w: 6,
+    d: 3,
+    wallHeight: 240,
+    wallColor: derelict ? FACADE.brickDark : FACADE.paintedOx,
+    trimColor: TUNGSTEN.amber,
+    theatre: true,
+    derelict,
+    seed: 41,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Amenities — storefront fronts: glass band (emissive), awning, sign block.
+// ---------------------------------------------------------------------------
+interface AmenityStyle {
+  wallColor: number;
+  awningColor: number;
+  wallHeight: number;
+  w: number;
+}
+
+const AMENITY_STYLES: Record<string, AmenityStyle> = {
+  food_cart:   { wallColor: 0x3c3a44, awningColor: 0xb05a4a, wallHeight: 44, w: 2 },
+  cafe:        { wallColor: FACADE.paintedTeal, awningColor: 0xc8a45a, wallHeight: 76, w: 2 },
+  bar:         { wallColor: FACADE.paintedOx, awningColor: 0x3a5a52, wallHeight: 80, w: 2 },
+  gift_shop:   { wallColor: 0x4a4456, awningColor: 0xb08446, wallHeight: 72, w: 2 },
+  restaurant:  { wallColor: FACADE.brickWarm, awningColor: 0x70343c, wallHeight: 88, w: 3 },
+  late_lounge: { wallColor: 0x2e3246, awningColor: 0x6a4a78, wallHeight: 92, w: 3 },
+};
+
+export function bakeAmenity(baker: Baker, kind: string): BuildingBake {
+  const style = AMENITY_STYLES[kind] ?? AMENITY_STYLES.cafe;
+  const spec: BuildingSpec = {
+    key: `amen-${kind}`,
+    w: style.w,
+    d: 3,
+    wallHeight: style.wallHeight,
+    wallColor: style.wallColor,
+    trimColor: FACADE.trim,
+    theatre: false,
+    derelict: false,
+    seed: 13,
+  };
+  const f = frame(spec);
+  const extentW = (spec.w + spec.d) * HW;
+  const extentH = f.h + (spec.w + spec.d) * HH + 2;
+  const bounds = (g: G) => g.rect(0, 0, extentW, extentH).fill({ color: 0, alpha: 0.001 });
+
+  const glassY1 = 4;
+  const glassY2 = Math.min(spec.wallHeight - 26, 40);
+  const awnY1 = glassY2 + 2;
+  const awnY2 = awnY1 + 12;
+
+  const base = baker.bake(`bld-${spec.key}-base`, (g) => {
+    bounds(g);
+    drawShell(g, f, spec);
+    // Storefront glass band.
+    poly(g, facePatch(f, 0.08, 0.92, glassY1, glassY2), FACADE.glassDark);
+    poly(g, facePatch(f, 0.08, 0.92, glassY2 - 2, glassY2), spec.trimColor);
+    // Door split in the glass.
+    poly(g, facePatch(f, 0.46, 0.54, glassY1, glassY2 - 6), darken(spec.wallColor, 0.5));
+    // Awning with scalloped under-edge.
+    poly(g, facePatch(f, 0.04, 0.96, awnY1, awnY2), style.awningColor);
+    poly(g, facePatch(f, 0.04, 0.96, awnY1, awnY1 + 2), darken(style.awningColor, 0.7));
+    // Small sign block above the awning.
+    poly(g, facePatch(f, 0.3, 0.7, awnY2 + 4, Math.min(awnY2 + 14, spec.wallHeight - 8)), darken(style.awningColor, 0.85));
+  });
+
+  const emissive = baker.bake(`bld-${spec.key}-emissive`, (g) => {
+    bounds(g);
+    poly(g, facePatch(f, 0.08, 0.92, glassY1, glassY2), FACADE.glassGlow, 0.4);
+    poly(g, facePatch(f, 0.3, 0.7, awnY2 + 4, Math.min(awnY2 + 14, spec.wallHeight - 8)), TUNGSTEN.glow, 0.5);
+  });
+
+  return { base, emissive, anchorX: f.N[0], anchorY: f.N[1] };
+}
+
+// ---------------------------------------------------------------------------
+// Construction sites — neutral plinth + corner posts, one bake per width.
+// ---------------------------------------------------------------------------
+export function bakeConstruction(baker: Baker, w: number): BuildingBake {
+  const spec: BuildingSpec = {
+    key: `construction-${w}`,
+    w,
+    d: 3,
+    wallHeight: 26,
+    wallColor: 0x3a3e4c,
+    trimColor: 0x5a5e6c,
+    theatre: false,
+    derelict: false,
+    seed: 3,
+  };
+  const f = frame(spec);
+  const extentW = (spec.w + spec.d) * HW;
+  const extentH = 90 + (spec.w + spec.d) * HH + 2;
+
+  const base = baker.bake(`bld-${spec.key}-base`, (g) => {
+    g.rect(0, 0, extentW, extentH).fill({ color: 0, alpha: 0.001 });
+    drawShell(g, f, spec);
+    // Corner scaffold posts.
+    for (const corner of [f.W, f.S, f.E]) {
+      g.rect(corner[0] - 1.5, corner[1] - 84, 3, 84 - spec.wallHeight).fill({ color: 0x6a6048 });
+    }
+    // Cross brace along the front.
+    const a = up(lerpP(f.W, f.S, 0.05), 70);
+    const b = up(lerpP(f.W, f.S, 0.95), 30);
+    g.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ color: 0x6a6048, width: 2.5, alpha: 0.9 });
+    // Hazard stripe on the plinth.
+    poly(g, facePatch(f, 0, 1, 10, 16), 0x8a7434, 0.7);
+  });
+
+  return { base, emissive: null, anchorX: f.N[0], anchorY: f.N[1] };
 }

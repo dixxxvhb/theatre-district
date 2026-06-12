@@ -80,9 +80,9 @@ interface GradeStop {
 /** Keyframes through the showtime pulse: cool flat afternoon → amber dusk →
  *  marquee night → late-night wind-down. */
 const GRADE_STOPS: GradeStop[] = [
-  { t: 0.0,  world: 0xb8bcd0, skyTop: 0x2a3754, skyHorizon: 0x6a6f8a, lights: 0.0 },  // flat afternoon
-  { t: 0.3,  world: 0xc8b8a8, skyTop: 0x2e3050, skyHorizon: 0x9a6a58, lights: 0.1 },  // light warming
-  { t: 0.45, world: 0xd8a988, skyTop: 0x232447, skyHorizon: 0xc77b50, lights: 0.45 }, // golden hour
+  { t: 0.0,  world: 0xd8dcec, skyTop: 0x32405e, skyHorizon: 0x7a7f9a, lights: 0.0 },  // flat afternoon
+  { t: 0.3,  world: 0xe0d0bc, skyTop: 0x343658, skyHorizon: 0xa87862, lights: 0.1 },  // light warming
+  { t: 0.45, world: 0xe2b390, skyTop: 0x232447, skyHorizon: 0xc77b50, lights: 0.45 }, // golden hour
   { t: 0.6,  world: 0x6a76a8, skyTop: 0x0c1020, skyHorizon: 0x3a3460, lights: 1.0 },  // curtain — night
   { t: 0.8,  world: 0x5e6a9c, skyTop: 0x0a0d18, skyHorizon: 0x2a2848, lights: 1.0 },  // post-show
   { t: 1.0,  world: 0x4e5784, skyTop: 0x080a12, skyHorizon: 0x1e1c36, lights: 0.8 },  // wind-down
