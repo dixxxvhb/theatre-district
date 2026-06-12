@@ -5,12 +5,14 @@
 // through the Production Desk in Session 5.
 
 import { useCallback, useEffect, useState } from 'react';
-import { DistrictCanvas } from './game/render/DistrictCanvas';
+import { DistrictCanvas, type PeepThought } from './game/render/DistrictCanvas';
 import { calendarLabel, dayPhase } from './game/sim/calendar';
 import type { Speed } from './game/sim/clock';
+import { resetSims } from './game/sim/runtime';
 import { mostRecentSave } from './store/saves';
 import { useTDStore } from './store/store';
 import { BuildPalette } from './ui/BuildPalette';
+import { NotificationToast } from './ui/components/NotificationToast';
 import { SelectionCard } from './ui/SelectionCard';
 import { DevPanel, devEnabled } from './ui/dev/DevPanel';
 import { SaveMenu } from './ui/SaveMenu';
@@ -58,7 +60,10 @@ function TitleScreen() {
           className="w-64 rounded border border-amber-900/50 bg-gray-900/80 px-3 py-2 text-center text-amber-100 placeholder-gray-500 outline-none focus:border-amber-600"
         />
         <button
-          onClick={() => newGame(name)}
+          onClick={() => {
+            resetSims();
+            newGame(name);
+          }}
           className="w-64 rounded border border-amber-700 bg-amber-950/60 px-4 py-2 text-amber-100 hover:bg-amber-900/60"
         >
           New District
@@ -67,7 +72,10 @@ function TitleScreen() {
           <button
             onClick={() => {
               const state = mostRecentSave();
-              if (state) hydrate(state);
+              if (state) {
+                resetSims();
+                hydrate(state);
+              }
             }}
             className="w-64 rounded border border-gray-700 bg-gray-900/60 px-4 py-2 text-gray-300 hover:bg-gray-800"
           >
@@ -161,7 +169,12 @@ export default function App() {
   const paletteOpen = useTDStore((s) => s.ui.paletteOpen);
   const [savesOpen, setSavesOpen] = useState(false);
   const [hoverBuzz, setHoverBuzz] = useState<string | null>(null);
+  const [thought, setThought] = useState<PeepThought | null>(null);
   const onHoverBuzz = useCallback((label: string | null) => setHoverBuzz(label), []);
+  const onThought = useCallback((t: PeepThought) => {
+    setThought(t);
+    window.setTimeout(() => setThought((cur) => (cur === t ? null : cur)), 3200);
+  }, []);
 
   // Global keyboard: Space pause · 1/2/3 speeds · B build · Tab buzz · Esc cancel.
   useEffect(() => {
@@ -200,7 +213,7 @@ export default function App() {
     <div className="flex h-screen flex-col bg-[#0a0d18]">
       <TopBar onOpenSaves={() => setSavesOpen(true)} />
       <div className="relative flex-1">
-        <DistrictCanvas onHoverBuzz={onHoverBuzz} />
+        <DistrictCanvas onHoverBuzz={onHoverBuzz} onThought={onThought} />
         {paletteOpen && <BuildPalette />}
         <SelectionCard />
         {hoverBuzz !== null && (
@@ -208,8 +221,18 @@ export default function App() {
             Buzz {hoverBuzz}
           </div>
         )}
+        {thought && (
+          <div
+            className="pointer-events-none absolute z-30 max-w-56 -translate-x-1/2 -translate-y-full rounded-lg border border-amber-900/40 bg-[#f2e8d5] px-3 py-1.5 text-xs text-gray-900 shadow-xl"
+            style={{ left: thought.sx, top: thought.sy - 14, fontFamily: 'Georgia, serif' }}
+          >
+            {thought.text}
+            <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-6 border-t-6 border-x-transparent border-t-[#f2e8d5]" />
+          </div>
+        )}
       </div>
       {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
+      <NotificationToast />
       {devEnabled() && <DevPanel />}
     </div>
   );

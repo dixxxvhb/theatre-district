@@ -4,6 +4,7 @@
 // store actions (this layer only previews and forwards).
 
 import type { StreetScene, GhostSpec } from './StreetScene';
+import { agentAt } from './CrowdView';
 import { worldToGrid } from './iso';
 import { useTDStore } from '../../store/store';
 import { STREET } from '../config/balance';
@@ -26,6 +27,8 @@ export class StreetInteraction {
   private detach: Array<() => void> = [];
   /** Suppresses click-after-drag (camera pan ends with a click event). */
   private downAt = { x: 0, y: 0 };
+  /** Set by the canvas: clicked a crowd member (agent index, screen coords). */
+  onPeepClick: ((agent: number, sx: number, sy: number) => void) | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -50,6 +53,16 @@ export class StreetInteraction {
       const dragged = Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y) > 6;
       if (dragged) return;
       this.updateHover(e);
+      // Crowd first: clicking a person shows their thought (no tool active).
+      if (!useTDStore.getState().ui.tool && this.onPeepClick) {
+        const rect = this.canvas.getBoundingClientRect();
+        const { wx, wy } = this.toWorld(e.clientX - rect.left, e.clientY - rect.top);
+        const agent = agentAt(wx, wy);
+        if (agent !== -1) {
+          this.onPeepClick(agent, e.clientX - rect.left, e.clientY - rect.top);
+          return;
+        }
+      }
       this.click(e.shiftKey);
     };
     const onContext = (e: Event) => e.preventDefault();

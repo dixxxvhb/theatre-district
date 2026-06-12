@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useTDStore } from '../../store/store';
 import { runtime } from '../../game/sim/runtime';
+import { crowd } from '../../game/sim/crowd';
 import { CALENDAR } from '../../game/config/balance';
 
 export function devEnabled(): boolean {
@@ -20,9 +21,12 @@ export function DevPanel() {
   const setTimeOfDay = useTDStore((s) => s.setTimeOfDay);
   const era = useTDStore((s) => s.street.era);
 
-  const [meters, setMeters] = useState({ fps: 0, tps: 0 });
+  const [meters, setMeters] = useState({ fps: 0, tps: 0, peeps: 0 });
   useEffect(() => {
-    const id = setInterval(() => setMeters({ fps: runtime.fps(), tps: runtime.ticksPerSecond() }), 500);
+    const id = setInterval(
+      () => setMeters({ fps: runtime.fps(), tps: runtime.ticksPerSecond(), peeps: crowd.count() }),
+      500,
+    );
     return () => clearInterval(id);
   }, []);
 
@@ -35,7 +39,7 @@ export function DevPanel() {
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-bold tracking-widest text-amber-400">DEV</span>
         <span className="font-mono text-[10px] text-gray-400">
-          {meters.fps} fps · {meters.tps} t/s
+          {meters.fps} fps · {meters.tps} t/s · {meters.peeps} ppl
         </span>
       </div>
       <div className="mb-2 flex flex-wrap gap-1">
@@ -70,7 +74,7 @@ export function DevPanel() {
         ))}
       </div>
       <div className="flex flex-wrap gap-1">
-        <button className={stub} disabled title="Session 4">Crowd surge</button>
+        <button className={btn} onClick={() => crowd.surge(40)}>Crowd surge</button>
         <button className={stub} disabled title="Session 7">Weather</button>
         <button className={stub} disabled title="Session 6">Event</button>
       </div>

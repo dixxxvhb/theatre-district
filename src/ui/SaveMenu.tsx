@@ -14,6 +14,7 @@ import {
   type SaveSlotMeta,
 } from '../store/saves';
 import { snapshotTDState, useTDStore } from '../store/store';
+import { resetSims } from '../game/sim/runtime';
 
 export function SaveMenu({ onClose }: { onClose: () => void }) {
   const hydrate = useTDStore((s) => s.hydrate);
@@ -36,6 +37,7 @@ export function SaveMenu({ onClose }: { onClose: () => void }) {
       setNotice('That save could not be loaded.');
       return;
     }
+    resetSims();
     hydrate(state);
     onClose();
   };
@@ -47,6 +49,7 @@ export function SaveMenu({ onClose }: { onClose: () => void }) {
       setNotice('Not a valid Theatre District save file.');
       return;
     }
+    resetSims();
     hydrate(state);
     onClose();
   };

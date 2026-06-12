@@ -19,8 +19,23 @@ import { bakeTextureKit } from './kit/textures';
 import { gradeAt } from './kit/palette';
 import { Grain, Sky } from './kit/atmosphere';
 import { getBuzzField } from '../sim/buzzCache';
+import { bakeFigures, CrowdView } from './CrowdView';
+import { showtime } from '../sim/showtime';
+import { thoughtFor } from '../data/peepThoughts';
 
-export function DistrictCanvas({ onHoverBuzz }: { onHoverBuzz?: (label: string | null) => void }) {
+export interface PeepThought {
+  text: string;
+  sx: number;
+  sy: number;
+}
+
+export function DistrictCanvas({
+  onHoverBuzz,
+  onThought,
+}: {
+  onHoverBuzz?: (label: string | null) => void;
+  onThought?: (t: PeepThought) => void;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,11 +68,17 @@ export function DistrictCanvas({ onHoverBuzz }: { onHoverBuzz?: (label: string |
       engine.world.addChild(scene.dim, scene.lights, scene.overlay);
       engine.app.stage.addChild(grain.sprite);
 
+      const crowdView = new CrowdView(scene.objectLayer, bakeFigures(baker));
+      showtime.onIgnite = () => scene.ignite();
+
       camera = new StreetCamera(engine.world, engine.app.canvas);
       interaction = new StreetInteraction(engine.app.canvas, scene, (sx, sy) => {
         const p = engine.world.toLocal({ x: sx, y: sy });
         return { wx: p.x, wy: p.y };
       });
+      interaction.onPeepClick = (agent, sx, sy) => {
+        onThought?.({ text: thoughtFor(agent), sx, sy });
+      };
 
       const fitToEra = (era: number) => {
         const cols = columnsForEra(era);
@@ -98,6 +119,7 @@ export function DistrictCanvas({ onHoverBuzz }: { onHoverBuzz?: (label: string |
         const grade = gradeAt(t);
         const { width, height } = engine.app.screen;
         scene.update(grade, deltaMS);
+        crowdView.sync(performance.now());
         sky.update(grade, width, height);
         grain.update(deltaMS, width, height);
 
@@ -124,6 +146,7 @@ export function DistrictCanvas({ onHoverBuzz }: { onHoverBuzz?: (label: string |
 
     return () => {
       cancelled = true;
+      showtime.onIgnite = null;
       document.removeEventListener('visibilitychange', onVisibility);
       unsub?.();
       interaction?.destroy();

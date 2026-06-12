@@ -11,7 +11,7 @@
 // tint, light alpha, flicker, particles. Never geometry, never bakes.
 
 import { BlurFilter, Container, Graphics, Sprite } from 'pixi.js';
-import { AMENITIES, ISO, STREET, THEATRES } from '../config/balance';
+import { AMENITIES, ISO, SHOWTIME, STREET, THEATRES } from '../config/balance';
 import type { BuildingKind, DecorationKind, PlacedBuilding, PlacedDecoration, StreetState, UpkeepState } from '../../types/td';
 import { columnsForEra, footprintRows, sidewalkRowFor, tileKind } from '../street/topology';
 import { isTheatre } from '../street/buzz';
@@ -77,6 +77,27 @@ export class StreetScene {
   private drawnLitter: UpkeepState['litter'] | null = null;
   private overlayOn = false;
   private drawnOverlayField: Float32Array | null = null;
+  /** Marquee-ignition cascade state (elapsed-ms timestamp, null = idle). */
+  private ignitionStart: number | null = null;
+  private minLightX = 0;
+
+  /** The crowd view needs the depth-sorted layer; expose it once. */
+  get objectLayer(): Container {
+    return this.objectsC;
+  }
+
+  /** Showtime: lights cascade on, west to east. */
+  ignite(): void {
+    if (prefersReducedMotion()) return; // function over flourish
+    this.ignitionStart = this.elapsed;
+    let min = Infinity;
+    for (const c of this.lights.children) {
+      if (c.x < min) min = c.x;
+      const tagged = c as Container & { __baseAlpha?: number };
+      if (tagged.__baseAlpha === undefined) tagged.__baseAlpha = c.alpha;
+    }
+    this.minLightX = min === Infinity ? 0 : min;
+  }
 
   constructor(baker: Baker, kit: TextureKit) {
     this.kit = kit;
@@ -174,7 +195,21 @@ export class StreetScene {
     this.dim.tint = grade.world;
     this.lights.alpha = grade.lights;
     this.elapsed += dtMs;
-    if (this.animateFlicker) {
+
+    // Marquee-ignition cascade: each light steps on by street position.
+    if (this.ignitionStart !== null) {
+      const since = this.elapsed - this.ignitionStart;
+      let allOn = true;
+      for (const c of this.lights.children) {
+        const tagged = c as Container & { __baseAlpha?: number };
+        const base = tagged.__baseAlpha ?? c.alpha;
+        const delay = ((c.x - this.minLightX) / ISO.TILE_WIDTH) * SHOWTIME.IGNITION_MS_PER_COLUMN;
+        const f = Math.min(Math.max((since - delay) / SHOWTIME.IGNITION_RAMP_MS, 0), 1);
+        c.alpha = base * f;
+        if (f < 1) allOn = false;
+      }
+      if (allOn) this.ignitionStart = null;
+    } else if (this.animateFlicker) {
       for (const f of this.flickers) {
         const t = this.elapsed / 1000;
         const n = 0.62 + 0.38 * Math.abs(Math.sin(t * 7 + f.phase) * Math.sin(t * 13.7 + f.phase * 2.3));
@@ -188,7 +223,14 @@ export class StreetScene {
 
   private rebuildAll(street: StreetState): void {
     this.rebuildGround(street.era);
-    this.objectsC.removeChildren().forEach((c) => c.destroy());
+    // Only scene-owned children: the crowd pool shares this container for
+    // depth sorting and must survive rebuilds (its sprites are pooled).
+    for (const c of [...this.objectsC.children]) {
+      if ((c as Container & { __sceneOwned?: boolean }).__sceneOwned) {
+        this.objectsC.removeChild(c);
+        c.destroy();
+      }
+    }
     this.lights.removeChildren().forEach((c) => c.destroy());
     this.flickers = [];
     const emitters: Array<{ wx: number; wy: number }> = [];
@@ -230,7 +272,7 @@ export class StreetScene {
         const lamp = new Sprite(working ? this.kit.lampWorking : this.kit.lampBroken);
         lamp.position.set(wx - 6.5, wy - 84);
         lamp.zIndex = y * ROW_Z + x;
-        this.objectsC.addChild(lamp);
+        this.addOwned(lamp);
         if (working) this.addLampGlow(wx, wy, flickering, x);
       }
       // Ambient grates (era dressing, separate from buyable steam grates).
@@ -240,7 +282,7 @@ export class StreetScene {
         const grate = new Sprite(this.kit.steamGrate);
         grate.position.set(wx - 15, wy - 7);
         grate.zIndex = y * ROW_Z + x - 0.5;
-        this.objectsC.addChild(grate);
+        this.addOwned(grate);
         emitters.push({ wx, wy: wy - 4 });
       }
     }
@@ -257,7 +299,7 @@ export class StreetScene {
       const { px, py } = this.buildingOrigin(b.x, b.side, bake);
       sprite.position.set(px, py);
       sprite.zIndex = frontRow * ROW_Z + b.x;
-      this.objectsC.addChild(sprite);
+      this.addOwned(sprite);
 
       if (!underConstruction && bake.emissive && b.condition >= 0.4) {
         const em = new Sprite(bake.emissive);
@@ -283,7 +325,7 @@ export class StreetScene {
       const sprite = new Sprite(bake.tex);
       sprite.position.set(wx + bake.ox, wy + bake.oy);
       sprite.zIndex = d.y * ROW_Z + d.x;
-      this.objectsC.addChild(sprite);
+      this.addOwned(sprite);
       if (bake.light) this.addDecoLight(bake, wx, wy, d.x);
       if (bake.steam) emitters.push({ wx, wy: wy - 4 });
     }
@@ -393,7 +435,13 @@ export class StreetScene {
     sprite.tint = tint;
     sprite.alpha = alpha;
     sprite.zIndex = y * ROW_Z + x + 0.5;
+    if (parent === this.objectsC) (sprite as Sprite & { __sceneOwned?: boolean }).__sceneOwned = true;
     parent.addChild(sprite);
+  }
+
+  private addOwned(c: Container): void {
+    (c as Container & { __sceneOwned?: boolean }).__sceneOwned = true;
+    this.objectsC.addChild(c);
   }
 
   private addTileMarker(x: number, y: number, tint: number): void {
