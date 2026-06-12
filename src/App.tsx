@@ -4,12 +4,14 @@
 // shell was replaced in Session 1; its show-production systems return
 // through the Production Desk in Session 5.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DistrictCanvas } from './game/render/DistrictCanvas';
 import { calendarLabel, dayPhase } from './game/sim/calendar';
 import type { Speed } from './game/sim/clock';
 import { mostRecentSave } from './store/saves';
 import { useTDStore } from './store/store';
+import { BuildPalette } from './ui/BuildPalette';
+import { SelectionCard } from './ui/SelectionCard';
 import { DevPanel, devEnabled } from './ui/dev/DevPanel';
 import { SaveMenu } from './ui/SaveMenu';
 
@@ -126,6 +128,7 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
             </button>
           ))}
         </div>
+        <BuildButton />
         <button
           onClick={onOpenSaves}
           className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
@@ -137,21 +140,48 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
   );
 }
 
+function BuildButton() {
+  const paletteOpen = useTDStore((s) => s.ui.paletteOpen);
+  const togglePalette = useTDStore((s) => s.togglePalette);
+  return (
+    <button
+      onClick={togglePalette}
+      title="B"
+      className={`rounded px-2 py-1 text-xs ${
+        paletteOpen ? 'bg-amber-800 text-amber-100' : 'border border-gray-700 text-gray-400 hover:bg-gray-800'
+      }`}
+    >
+      Build
+    </button>
+  );
+}
+
 export default function App() {
   const initialized = useTDStore((s) => s.initialized);
+  const paletteOpen = useTDStore((s) => s.ui.paletteOpen);
   const [savesOpen, setSavesOpen] = useState(false);
+  const [hoverBuzz, setHoverBuzz] = useState<string | null>(null);
+  const onHoverBuzz = useCallback((label: string | null) => setHoverBuzz(label), []);
 
-  // Global keyboard: Space = pause toggle, 1/2/3 = speeds.
+  // Global keyboard: Space pause · 1/2/3 speeds · B build · Tab buzz · Esc cancel.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const { togglePause, setSpeed } = useTDStore.getState();
+      const s = useTDStore.getState();
       if (e.code === 'Space') {
         e.preventDefault();
-        togglePause();
-      } else if (e.key === '1') setSpeed('normal');
-      else if (e.key === '2') setSpeed('fast');
-      else if (e.key === '3') setSpeed('ultra');
+        s.togglePause();
+      } else if (e.key === '1') s.setSpeed('normal');
+      else if (e.key === '2') s.setSpeed('fast');
+      else if (e.key === '3') s.setSpeed('ultra');
+      else if (e.key === 'b' || e.key === 'B') s.togglePalette();
+      else if (e.key === 'Tab') {
+        e.preventDefault();
+        s.toggleBuzzOverlay();
+      } else if (e.key === 'Escape') {
+        if (s.ui.tool) s.setTool(null);
+        else if (s.ui.selectedId) s.select(null);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -170,7 +200,14 @@ export default function App() {
     <div className="flex h-screen flex-col bg-[#0a0d18]">
       <TopBar onOpenSaves={() => setSavesOpen(true)} />
       <div className="relative flex-1">
-        <DistrictCanvas />
+        <DistrictCanvas onHoverBuzz={onHoverBuzz} />
+        {paletteOpen && <BuildPalette />}
+        <SelectionCard />
+        {hoverBuzz !== null && (
+          <div className="pointer-events-none absolute top-2 left-1/2 z-20 -translate-x-1/2 rounded border border-amber-900/40 bg-gray-950/90 px-2 py-1 font-mono text-xs text-amber-200">
+            Buzz {hoverBuzz}
+          </div>
+        )}
       </div>
       {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
       {devEnabled() && <DevPanel />}
