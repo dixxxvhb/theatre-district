@@ -178,6 +178,14 @@ export interface TDState {
   darkWeekDays: number;
   /** Per-era flag: has the patron rescue been used in this era? */
   patronRescueUsedEra: number;
+  /** Teach cards already fired (by id). */
+  seenTeachCards: string[];
+  /** Teach card showing right now (front of the queue). */
+  pendingTeachCardId: string | null;
+  /** Once-only authored intro is dismissed. */
+  introCompleted: boolean;
+  /** Once-only finale Gala is played. */
+  finalePlayed: boolean;
   settings: SettingsState;
 }
 

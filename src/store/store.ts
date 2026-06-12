@@ -23,6 +23,8 @@ import { reviewShow, starString, verdictMomentum } from '../game/data/critics';
 import { eventById, rollDailyEvent } from '../game/sim/events';
 import { DARK_WEEK, REPAIR_COST_PER_POINT, THEATRES, WEATHER } from '../game/config/balance';
 import { seasonOf } from '../game/sim/calendar';
+import { eraComplete, ERAS } from '../game/data/eras';
+import { TEACH_CARDS } from '../game/data/teachCards';
 import type { PlaybillEntry } from '../types/td';
 
 function pickById(id: string) {
@@ -122,6 +124,12 @@ export interface TDActions {
   repairBuilding: (id: string) => void;
   setWeather: (weather: 'clear' | 'rain' | 'heat') => void;
 
+  /** Session 8. */
+  advanceEra: () => boolean;
+  dismissTeachCard: () => void;
+  markIntroComplete: () => void;
+  markFinalePlayed: () => void;
+
   /** Dev: jump to an era (street length follows; Session 8 adds the real gate). */
   setEra: (era: number) => void;
   /** Dev: jump to a time of day (0..1) — lighting/pulse playtesting. */
@@ -145,6 +153,10 @@ export function initialTDState(): TDState {
     weather: 'clear',
     darkWeekDays: 0,
     patronRescueUsedEra: -1,
+    seenTeachCards: [],
+    pendingTeachCardId: null,
+    introCompleted: false,
+    finalePlayed: false,
     settings: { buzzOverlay: false },
   };
 }
@@ -587,6 +599,34 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
 
   setWeather: (weather) => set({ weather }),
 
+  advanceEra: () => {
+    const s = get();
+    if (!eraComplete(s, s.street.era)) return false;
+    const next = Math.min(4, s.street.era + 1);
+    const def = ERAS[next];
+    set((st) => ({
+      street: { ...st.street, era: next },
+      playbill: addPlaybillEntry(st.playbill, st.time.day, {
+        headline: `Era ${next + 1} — ${def.name}`,
+        lines: [def.arrivalLine, 'The street extends. A new chapter begins.'],
+      }),
+    }));
+    return true;
+  },
+
+  dismissTeachCard: () =>
+    set((s) => {
+      const id = s.pendingTeachCardId;
+      if (!id) return s;
+      return {
+        pendingTeachCardId: null,
+        seenTeachCards: [...s.seenTeachCards, id],
+      };
+    }),
+
+  markIntroComplete: () => set({ introCompleted: true }),
+  markFinalePlayed: () => set({ finalePlayed: true }),
+
   resolveDecision: (option) => {
     const s = get();
     const pending = s.pendingDecision;
@@ -804,6 +844,18 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
       });
     }
 
+    // Teach card check — first triggered card not yet seen, not already showing.
+    let pendingTeachCardId = s.pendingTeachCardId;
+    if (!pendingTeachCardId) {
+      for (const card of TEACH_CARDS) {
+        if (s.seenTeachCards.includes(card.id)) continue;
+        if (card.trigger({ ...s, productions } as TDState)) {
+          pendingTeachCardId = card.id;
+          break;
+        }
+      }
+    }
+
     // A landed decision OR a choice-event pauses the game (spec: auto-pause).
     const pauseFor = (newDecision && !s.pendingDecision) || (pendingEvent && !s.pendingEvent);
     set((st) => {
@@ -819,6 +871,7 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
         playbill,
         weather,
         darkWeekDays,
+        pendingTeachCardId,
         economy: { ...st.economy, cash: projectedCash },
         time: pauseFor && st.time.speed !== 'paused' ? { ...st.time, speed: 'paused' } : st.time,
       };
@@ -864,6 +917,10 @@ export function snapshotTDState(): TDState {
     weather: s.weather,
     darkWeekDays: s.darkWeekDays,
     patronRescueUsedEra: s.patronRescueUsedEra,
+    seenTeachCards: s.seenTeachCards,
+    pendingTeachCardId: s.pendingTeachCardId,
+    introCompleted: s.introCompleted,
+    finalePlayed: s.finalePlayed,
     settings: s.settings,
   };
 }

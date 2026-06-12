@@ -128,6 +128,10 @@ function migrate(state: TDState, fromVersion: number): TDState {
     weather: state.weather ?? 'clear',
     darkWeekDays: state.darkWeekDays ?? 0,
     patronRescueUsedEra: state.patronRescueUsedEra ?? -1,
+    seenTeachCards: state.seenTeachCards ?? [],
+    pendingTeachCardId: state.pendingTeachCardId ?? null,
+    introCompleted: state.introCompleted ?? true, // existing saves: skip intro
+    finalePlayed: state.finalePlayed ?? false,
   };
   if (fromVersion < 2) next.productions = {};
   return next;

@@ -11,13 +11,18 @@ import type { Speed } from './game/sim/clock';
 import { resetSims } from './game/sim/runtime';
 import { mostRecentSave } from './store/saves';
 import { useTDStore } from './store/store';
+import { Almanac } from './ui/Almanac';
 import { BuildPalette } from './ui/BuildPalette';
 import { NotificationToast } from './ui/components/NotificationToast';
 import { DecisionModal } from './ui/desk/DecisionModal';
 import { EventModal } from './ui/desk/EventModal';
 import { ProductionDesk } from './ui/desk/ProductionDesk';
+import { EraPanel } from './ui/EraPanel';
+import { Finale } from './ui/Finale';
+import { Intro } from './ui/Intro';
 import { Playbill } from './ui/Playbill';
 import { SelectionCard } from './ui/SelectionCard';
+import { TeachCardModal } from './ui/TeachCardModal';
 import { DevPanel, devEnabled } from './ui/dev/DevPanel';
 import { SaveMenu } from './ui/SaveMenu';
 
@@ -143,6 +148,7 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
           ))}
         </div>
         <BuildButton />
+        <AlmanacButton />
         <PlaybillButton />
         <button
           onClick={onOpenSaves}
@@ -204,6 +210,18 @@ function DarkWeekChip() {
   );
 }
 
+function AlmanacButton() {
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new CustomEvent('td:open-almanac'))}
+      title="H"
+      className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
+    >
+      Almanac
+    </button>
+  );
+}
+
 function PlaybillButton() {
   const count = useTDStore((s) => s.playbill.length);
   // Open via parent — emit a global event since this lives inside TopBar's tree.
@@ -223,12 +241,22 @@ export default function App() {
   const paletteOpen = useTDStore((s) => s.ui.paletteOpen);
   const [savesOpen, setSavesOpen] = useState(false);
   const [playbillOpen, setPlaybillOpen] = useState(false);
+  const [almanacOpen, setAlmanacOpen] = useState(false);
+  const [photoMode, setPhotoMode] = useState(false);
   const [hoverBuzz, setHoverBuzz] = useState<string | null>(null);
   const [thought, setThought] = useState<PeepThought | null>(null);
   useEffect(() => {
-    const onOpen = () => setPlaybillOpen(true);
-    window.addEventListener('td:open-playbill', onOpen);
-    return () => window.removeEventListener('td:open-playbill', onOpen);
+    const onOpenPlaybill = () => setPlaybillOpen(true);
+    const onOpenAlmanac = () => setAlmanacOpen(true);
+    const onTogglePhoto = () => setPhotoMode((m) => !m);
+    window.addEventListener('td:open-playbill', onOpenPlaybill);
+    window.addEventListener('td:open-almanac', onOpenAlmanac);
+    window.addEventListener('td:toggle-photo', onTogglePhoto);
+    return () => {
+      window.removeEventListener('td:open-playbill', onOpenPlaybill);
+      window.removeEventListener('td:open-almanac', onOpenAlmanac);
+      window.removeEventListener('td:toggle-photo', onTogglePhoto);
+    };
   }, []);
   const onHoverBuzz = useCallback((label: string | null) => setHoverBuzz(label), []);
   const onThought = useCallback((t: PeepThought) => {
@@ -252,6 +280,10 @@ export default function App() {
         e.preventDefault();
         s.toggleBuzzOverlay();
       } else if (e.key === 'p' || e.key === 'P') {
+        window.dispatchEvent(new CustomEvent('td:toggle-photo'));
+      } else if (e.key === 'h' || e.key === 'H') {
+        window.dispatchEvent(new CustomEvent('td:open-almanac'));
+      } else if (e.key === 'n' || e.key === 'N') {
         window.dispatchEvent(new CustomEvent('td:open-playbill'));
       } else if (e.key === 'Escape') {
         if (s.ui.deskTheatreId) s.openDesk(null);
@@ -274,11 +306,12 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col bg-[#0a0d18]">
-      <TopBar onOpenSaves={() => setSavesOpen(true)} />
+      {!photoMode && <TopBar onOpenSaves={() => setSavesOpen(true)} />}
       <div className="relative flex-1">
         <DistrictCanvas onHoverBuzz={onHoverBuzz} onThought={onThought} />
-        {paletteOpen && <BuildPalette />}
-        <SelectionCard />
+        {!photoMode && <EraPanel />}
+        {!photoMode && paletteOpen && <BuildPalette />}
+        {!photoMode && <SelectionCard />}
         {hoverBuzz !== null && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-20 -translate-x-1/2 rounded border border-amber-900/40 bg-gray-950/90 px-2 py-1 font-mono text-xs text-amber-200">
             Buzz {hoverBuzz}
@@ -294,13 +327,22 @@ export default function App() {
           </div>
         )}
       </div>
-      <ProductionDesk />
-      <DecisionModal />
-      <EventModal />
-      {playbillOpen && <Playbill onClose={() => setPlaybillOpen(false)} />}
-      {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
-      <NotificationToast />
-      {devEnabled() && <DevPanel />}
+      {!photoMode && <ProductionDesk />}
+      {!photoMode && <DecisionModal />}
+      {!photoMode && <EventModal />}
+      {!photoMode && <TeachCardModal />}
+      <Intro />
+      <Finale />
+      {!photoMode && playbillOpen && <Playbill onClose={() => setPlaybillOpen(false)} />}
+      {!photoMode && almanacOpen && <Almanac onClose={() => setAlmanacOpen(false)} />}
+      {!photoMode && savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
+      {!photoMode && <NotificationToast />}
+      {!photoMode && devEnabled() && <DevPanel />}
+      {photoMode && (
+        <div className="pointer-events-auto fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-amber-900/40 bg-gray-950/85 px-3 py-1.5 text-xs text-amber-200 backdrop-blur-sm">
+          Photo mode — press P to return
+        </div>
+      )}
     </div>
   );
 }
