@@ -61,7 +61,7 @@ Campaign runs Sessions 0–10 (see v2.1 spec). **Mandatory stops:** #1 after Ses
 
 - ✅ **Session 0** (2026-06-12) — audit, pivot plan, CLAUDE.md, surface renames. → STOP #1 PASSED (salvage-quarry · rename everywhere · /v3/ down)
 - ✅ **Session 1** (2026-06-12) — foundation shipped: balance.ts, SimClock (fixed 10t/s), calendar, topology, TD store, saves TD-v1 + JSON file export/import, new shell, camera, debug street view, dev panel, 33 unit tests. Legacy BT store/UI quarantined (unimported, compiles) until Session 5 folds the show systems in.
-- 🔲 Session 2 — Marquee Noir rendering kit; empty Dark Block street, beautifully
+- ✅ **Session 2** (2026-06-12) — Marquee Noir kit shipped (`src/game/render/kit/`): palette + 6-keyframe grade (one world tint + sky tints + light-layer alpha), bake-once pipeline, building factory with base/emissive texture pairs, additive light layer w/ single BlurFilter bloom, sky/grain/steam atmosphere, era-aware lamp dressing, derelict playhouse seeded in newGame (carries the memorial mark), dev-panel time jumps. Screenshots in docs/theatre-district/.
 - 🔲 Session 3 — placement UX + Buzz + overlay + litter (unit tests: spread/falloff/sum/diminishing)
 - 🔲 Session 4 — crowds, showtime rhythm, marquee ignition, core loop closes (4a/4b split allowed) → STOP #2, deploy demo
 - 🔲 Session 5 — Production Desk (full show-system reuse, upgrades list, zero logic regressions)
