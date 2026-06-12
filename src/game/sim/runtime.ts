@@ -7,6 +7,8 @@
 import { SimClock } from './clock';
 import { snapshotTDState, useTDStore } from '../../store/store';
 import { AUTOSAVE_SLOT, saveGame } from '../../store/saves';
+import { crowd } from './crowd';
+import { showtime } from './showtime';
 
 export class GameRuntime {
   readonly clock: SimClock;
@@ -20,6 +22,9 @@ export class GameRuntime {
       onTick: () => {
         const dayRolled = useTDStore.getState().advanceTick();
         this.tickTimes.push(performance.now());
+        // Order matters: phase edges resolve before the crowd reacts to them.
+        showtime.tick();
+        crowd.tick();
         if (dayRolled) {
           useTDStore.getState().endOfDay();
           try {
@@ -58,3 +63,15 @@ export class GameRuntime {
 }
 
 export const runtime = new GameRuntime();
+
+/** Reset ephemeral sims after newGame / load — agents are never saved, they
+ *  respawn from game state (architecture rule #4). */
+export function resetSims(): void {
+  crowd.reset();
+  showtime.reset();
+}
+
+// Dev-server-only sim handle (QA scripts; see store.ts for the store handle).
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __tdSim?: object }).__tdSim = { crowd, runtime };
+}

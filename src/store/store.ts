@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import type { Speed } from '../game/sim/clock';
-import { DECORATIONS, DEMOLISH_REFUND, ECONOMY, TIME, UPKEEP } from '../game/config/balance';
+import { DECORATIONS, DEMOLISH_REFUND, ECONOMY, SHOWTIME, TIME, UPKEEP } from '../game/config/balance';
 import { canPlaceBuilding, canPlaceDecoration, canPlaceStringLights, catalogEntry } from '../game/street/placement';
 import type { BuildingKind, DecorationKind, TDState } from '../types/td';
 
@@ -62,6 +62,11 @@ export interface TDActions {
   /** Day-rollover upkeep: construction, aging, litter, sweeper payroll. */
   endOfDay: () => void;
 
+  /** Showtime (Session 4 simplified; Session 5 replaces the source). */
+  assignShow: (theatreId: string, title: string) => void;
+  recordNightly: (theatreId: string, attendance: number) => void;
+  updateMomentum: (theatreId: string, momentum: number) => void;
+
   /** Dev: jump to an era (street length follows; Session 8 adds the real gate). */
   setEra: (era: number) => void;
   /** Dev: jump to a time of day (0..1) — lighting/pulse playtesting. */
@@ -77,8 +82,15 @@ export function initialTDState(): TDState {
     economy: { cash: ECONOMY.STARTING_CASH },
     street: { era: 0, buildings: [], decorations: [] },
     upkeep: { litter: {}, sweeperHired: false },
+    productions: {},
     settings: { buzzOverlay: false },
   };
+}
+
+/** Deterministic-ish quality roll for Session-4 auto-assigned shows. */
+function rollQuality(): number {
+  const [lo, hi] = SHOWTIME.QUALITY_RANGE;
+  return Math.round(lo + Math.random() * (hi - lo));
 }
 
 export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
@@ -205,9 +217,14 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
     const b = s.street.buildings.find((bb) => bb.id === id);
     if (b) {
       s.addCash(Math.round(catalogEntry(b.kind).cost * DEMOLISH_REFUND));
-      set((st) => ({
-        street: { ...st.street, buildings: st.street.buildings.filter((bb) => bb.id !== id) },
-      }));
+      set((st) => {
+        const productions = { ...st.productions };
+        delete productions[id];
+        return {
+          street: { ...st.street, buildings: st.street.buildings.filter((bb) => bb.id !== id) },
+          productions,
+        };
+      });
       return;
     }
     set((st) => ({
@@ -228,6 +245,34 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
     }));
     return true;
   },
+
+  assignShow: (theatreId, title) =>
+    set((s) => ({
+      productions: {
+        ...s.productions,
+        [theatreId]: {
+          title,
+          quality: rollQuality(),
+          momentum: 1,
+          ticketPrice: SHOWTIME.DEFAULT_TICKET_PRICE,
+          lastAttendance: 0,
+        },
+      },
+    })),
+
+  recordNightly: (theatreId, attendance) =>
+    set((s) => {
+      const show = s.productions[theatreId];
+      if (!show) return s;
+      return { productions: { ...s.productions, [theatreId]: { ...show, lastAttendance: attendance } } };
+    }),
+
+  updateMomentum: (theatreId, momentum) =>
+    set((s) => {
+      const show = s.productions[theatreId];
+      if (!show) return s;
+      return { productions: { ...s.productions, [theatreId]: { ...show, momentum } } };
+    }),
 
   toggleSweeper: () =>
     set((s) => ({ upkeep: { ...s.upkeep, sweeperHired: !s.upkeep.sweeperHired } })),
@@ -298,6 +343,7 @@ export function snapshotTDState(): TDState {
     economy: s.economy,
     street: s.street,
     upkeep: s.upkeep,
+    productions: s.productions,
     settings: s.settings,
   };
 }

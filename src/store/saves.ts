@@ -118,6 +118,7 @@ function migrate(state: TDState, _fromVersion: number): TDState {
   return {
     ...state,
     upkeep: state.upkeep ?? { litter: {}, sweeperHired: false },
+    productions: state.productions ?? {},
   };
 }
 

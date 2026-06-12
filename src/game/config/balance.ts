@@ -168,6 +168,54 @@ export const UPKEEP = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// CROWD
+// Agents are ephemeral (never saved); these shape the street's daily breath.
+// ---------------------------------------------------------------------------
+export const CROWD = {
+  MAX_AGENTS: 300,
+  /** Base spawn probability per sim tick per point of street appeal. */
+  SPAWN_PER_APPEAL: 0.008,
+  SPAWN_MAX_PER_TICK: 3,
+  /** Phase multipliers — the showtime pulse in crowd form. */
+  PHASE_SPAWN: { quiet: 0.35, preshow: 1.6, curtain: 0.25, postshow: 0.9, winddown: 0.15 } as const,
+  WEEKEND_SPAWN_MULT: 1.45,
+  /** Walking speed, world px per sim tick (10 ticks/sec). */
+  WALK_SPEED: 7,
+  /** Lane wobble within the sidewalk, world px. */
+  LANE_SPREAD: 11,
+  /** Pause lengths in ticks. */
+  SPEND_TICKS: [18, 40] as const,
+  PHOTO_TICKS: [12, 25] as const,
+  /** Wallet range per visitor; amenity purchases draw from it. */
+  WALLET: [20, 60] as const,
+  AMENITY_SPEND: [6, 16] as const,
+  /** Chance to drop litter when leaving an amenity / after a show. */
+  LITTER_CHANCE: 0.22,
+  /** Litter flush cadence (sim ticks) — batches store writes. */
+  LITTER_FLUSH_TICKS: 40,
+} as const;
+
+// ---------------------------------------------------------------------------
+// SHOWTIME — the simplified Session-4 production loop. Session 5 replaces the
+// show source with the full Production Desk; the rhythm stays.
+// ---------------------------------------------------------------------------
+export const SHOWTIME = {
+  DEFAULT_TICKET_PRICE: 35,
+  /** Quality roll for auto-assigned shows (Session 4 placeholder). */
+  QUALITY_RANGE: [42, 88] as const,
+  /** Walk-in attendance per point of buzz at the theatre's door. */
+  WALKINS_PER_BUZZ: 1.6,
+  /** Momentum (word-of-mouth lite): nightly nudge scale and decay. */
+  MOMENTUM_GAIN: 0.08,
+  MOMENTUM_DECAY: 0.03,
+  MOMENTUM_MIN: 0.5,
+  MOMENTUM_MAX: 1.6,
+  /** Marquee ignition cascade: delay per column, total ramp per light. */
+  IGNITION_MS_PER_COLUMN: 110,
+  IGNITION_RAMP_MS: 600,
+} as const;
+
+// ---------------------------------------------------------------------------
 // ECONOMY  [LOCKED anchors; exact curve numbers are tunable]
 // ---------------------------------------------------------------------------
 export const ECONOMY = {

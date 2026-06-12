@@ -90,6 +90,18 @@ export interface SettingsState {
   buzzOverlay: boolean;
 }
 
+/** Session-4 simplified production — one running show per theatre. The full
+ *  Production Desk (Session 5) replaces the source; the shape persists. */
+export interface SimpleShow {
+  title: string;
+  /** 0–100 — drives word-of-mouth and (later) reviews. */
+  quality: number;
+  /** Word-of-mouth multiplier on attendance (MOMENTUM_MIN..MAX). */
+  momentum: number;
+  ticketPrice: number;
+  lastAttendance: number;
+}
+
 export interface TDState {
   initialized: boolean;
   districtName: string;
@@ -97,5 +109,7 @@ export interface TDState {
   economy: EconomyState;
   street: StreetState;
   upkeep: UpkeepState;
+  /** Keyed by theatre building id. */
+  productions: Record<string, SimpleShow>;
   settings: SettingsState;
 }
