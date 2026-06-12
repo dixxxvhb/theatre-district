@@ -1,0 +1,127 @@
+// Showtime — the daily pulse made mechanical. Phase edges drive everything:
+//   preshow  → marquees ignite, crowds head for the doors
+//   curtain  → queues admitted (capacity-capped), street goes quiet
+//   postshow → audiences flood out, the box-office beat lands
+//   winddown → amenity takings beat, last call
+//
+// Session 4 runs SIMPLIFIED shows (auto-assigned title + quality). Session 5
+// swaps the show source for the full Production Desk; this rhythm stays.
+// Pure math is exported for unit tests.
+
+import { SHOWTIME, THEATRES } from '../config/balance';
+import type { PlacedBuilding } from '../../types/td';
+import { isTheatre } from '../street/buzz';
+import { getBuzzField } from './buzzCache';
+import { crowd } from './crowd';
+import { useTDStore } from '../../store/store';
+import { dayPhase, type DayPhase } from './calendar';
+import { generateShowTitle } from '../data/shows';
+import { pushToast } from '../../ui/components/NotificationToast';
+import { sidewalkRowFor } from '../street/topology';
+
+// --- pure math (unit-tested) ---------------------------------------------------
+
+/** Nightly attendance: queued patrons + buzz-driven walk-ins, capacity-capped. */
+export function attendanceFor(queued: number, doorBuzz: number, capacity: number, momentum: number): number {
+  const walkIns = Math.max(0, doorBuzz) * SHOWTIME.WALKINS_PER_BUZZ * momentum;
+  return Math.min(capacity, Math.round(queued + walkIns));
+}
+
+/** Word-of-mouth lite: hits snowball, flops decay, everything drifts down. */
+export function nextMomentum(momentum: number, quality: number, fillRate: number): number {
+  const qualityPull = (quality - 60) / 100; // >60 builds, <60 erodes
+  const housePull = (fillRate - 0.5) * 0.5; // a packed house talks
+  const next = momentum + SHOWTIME.MOMENTUM_GAIN * (qualityPull + housePull) - SHOWTIME.MOMENTUM_DECAY;
+  return Math.min(SHOWTIME.MOMENTUM_MAX, Math.max(SHOWTIME.MOMENTUM_MIN, next));
+}
+
+// --- runtime driver ---------------------------------------------------------------
+
+export class ShowtimeDirector {
+  private lastPhase: DayPhase | null = null;
+  /** Scene hook set by the canvas: fires the marquee-ignition cascade. */
+  onIgnite: (() => void) | null = null;
+
+  /** Called once per sim tick, AFTER the store tick. */
+  tick(): void {
+    const s = useTDStore.getState();
+    if (!s.initialized) return;
+    const phase = dayPhase(s.time.tickOfDay);
+    if (phase === this.lastPhase) return;
+    const prev = this.lastPhase;
+    this.lastPhase = phase;
+    if (prev === null) return; // first tick after boot/load — no edge
+
+    if (phase === 'preshow') this.onPreshow(s);
+    else if (phase === 'curtain') this.onCurtain(s);
+    else if (phase === 'postshow') this.onPostshow(s);
+    else if (phase === 'winddown') this.onWinddown(s);
+  }
+
+  reset(): void {
+    this.lastPhase = null;
+  }
+
+  private operationalTheatres(s: ReturnType<typeof useTDStore.getState>): PlacedBuilding[] {
+    return s.street.buildings.filter((b) => isTheatre(b.kind) && b.constructionDaysLeft === 0 && b.condition >= 0.4);
+  }
+
+  private onPreshow(s: ReturnType<typeof useTDStore.getState>): void {
+    // Every operational theatre runs tonight; new houses get a show.
+    for (const t of this.operationalTheatres(s)) {
+      if (!s.productions[t.id]) s.assignShow(t.id, generateShowTitle());
+    }
+    this.onIgnite?.();
+  }
+
+  private onCurtain(s: ReturnType<typeof useTDStore.getState>): void {
+    const { field, cols } = getBuzzField(s.street, s.upkeep);
+    for (const t of this.operationalTheatres(s)) {
+      const show = s.productions[t.id];
+      if (!show) continue;
+      const capacity = THEATRES[t.kind as keyof typeof THEATRES].capacity;
+      const doorX = t.x + Math.floor(THEATRES[t.kind as keyof typeof THEATRES].width / 2);
+      const doorY = sidewalkRowFor(t.side);
+      const doorBuzz = field[doorY * cols + doorX] ?? 0;
+
+      const { admitted } = crowd.admit(t.id, capacity);
+      const attendance = attendanceFor(admitted, doorBuzz, capacity, show.momentum);
+      s.recordNightly(t.id, attendance);
+    }
+  }
+
+  private onPostshow(s: ReturnType<typeof useTDStore.getState>): void {
+    let total = 0;
+    const titles: string[] = [];
+    for (const t of this.operationalTheatres(s)) {
+      const show = s.productions[t.id];
+      if (!show || show.lastAttendance === 0) continue;
+      const capacity = THEATRES[t.kind as keyof typeof THEATRES].capacity;
+      const revenue = show.lastAttendance * show.ticketPrice;
+      total += revenue;
+      titles.push(`${show.title} $${revenue.toLocaleString()}`);
+
+      const fillRate = show.lastAttendance / capacity;
+      const goodShow = show.quality >= 62;
+      s.updateMomentum(t.id, nextMomentum(show.momentum, show.quality, fillRate));
+
+      const doorX = t.x + Math.floor(THEATRES[t.kind as keyof typeof THEATRES].width / 2);
+      crowd.release(t.id, doorX, t.side, goodShow);
+    }
+    if (total > 0) {
+      s.addCash(total);
+      pushToast(`Box office — ${titles.join(' · ')}`, 'money');
+    }
+  }
+
+  private onWinddown(s: ReturnType<typeof useTDStore.getState>): void {
+    const takings = crowd.collectTakings();
+    if (takings > 0) {
+      s.addCash(takings);
+      pushToast(`Late-night takings: $${takings.toLocaleString()}`, 'money');
+    }
+    crowd.lastCall();
+  }
+}
+
+export const showtime = new ShowtimeDirector();
