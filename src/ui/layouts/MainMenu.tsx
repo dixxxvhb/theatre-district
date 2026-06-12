@@ -84,7 +84,7 @@ export function MainMenu() {
               '0 0 40px rgba(212,165,116,0.3), 0 4px 8px rgba(0,0,0,0.5)',
           }}
         >
-          BROADWAY
+          THEATRE
         </h1>
         <h2
           className="text-4xl md:text-6xl font-bold tracking-[0.3em]"
@@ -95,7 +95,7 @@ export function MainMenu() {
               '0 0 30px rgba(184,134,11,0.3), 0 2px 4px rgba(0,0,0,0.5)',
           }}
         >
-          TYCOON
+          DISTRICT
         </h2>
         <div
           className="mt-4 h-px w-64 mx-auto"

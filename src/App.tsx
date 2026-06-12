@@ -202,7 +202,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
             className="text-amber-200 text-lg tracking-wide"
             style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
-            {theaterName || 'Broadway Tycoon'}
+            {theaterName || 'Theatre District'}
           </h1>
           <span className="text-gray-400 text-xs font-mono">{dateStr}</span>
           <span className="text-gray-600 text-xs px-2 py-0.5 rounded bg-gray-900/60 border border-gray-800/40">
