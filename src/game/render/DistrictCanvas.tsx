@@ -78,6 +78,7 @@ export function DistrictCanvas({
 
       const crowdView = new CrowdView(scene.objectLayer, bakeFigures(baker));
       showtime.onIgnite = () => scene.ignite();
+      showtime.onApplause = () => scene.applauseFlash();
 
       camera = new StreetCamera(engine.world, engine.app.canvas);
       interaction = new StreetInteraction(engine.app.canvas, scene, (sx, sy) => {
@@ -160,6 +161,7 @@ export function DistrictCanvas({
     return () => {
       cancelled = true;
       showtime.onIgnite = null;
+      showtime.onApplause = null;
       document.removeEventListener('visibilitychange', onVisibility);
       unsub?.();
       interaction?.destroy();

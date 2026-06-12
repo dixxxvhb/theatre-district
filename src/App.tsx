@@ -96,6 +96,28 @@ function TitleScreen() {
   );
 }
 
+function PulsingCash({ cash }: { cash: number }) {
+  const [pulse, setPulse] = useState(false);
+  const [lastCash, setLastCash] = useState(cash);
+  useEffect(() => {
+    if (cash > lastCash) {
+      setPulse(true);
+      const t = setTimeout(() => setPulse(false), 700);
+      setLastCash(cash);
+      return () => clearTimeout(t);
+    }
+    setLastCash(cash);
+  }, [cash, lastCash]);
+  return (
+    <span
+      className={`font-mono text-sm transition-colors duration-300 ${pulse ? 'text-emerald-300' : 'text-amber-200'}`}
+      style={{ textShadow: pulse ? '0 0 18px rgba(110,231,183,0.6)' : 'none' }}
+    >
+      ${cash.toLocaleString()}
+    </span>
+  );
+}
+
 function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
   const districtName = useTDStore((s) => s.districtName);
   const day = useTDStore((s) => s.time.day);
@@ -119,7 +141,7 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
         <DarkWeekChip />
       </div>
       <div className="flex items-center gap-3">
-        <span className="font-mono text-sm text-amber-200">${cash.toLocaleString()}</span>
+        <PulsingCash cash={cash} />
         <div className="flex items-center gap-1">
           <button
             onClick={togglePause}

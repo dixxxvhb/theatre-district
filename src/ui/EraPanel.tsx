@@ -7,7 +7,12 @@ import { useTDStore } from '../store/store';
 
 export function EraPanel() {
   const era = useTDStore((s) => s.street.era);
-  const state = useTDStore((s) => s);
+  // Re-run eraStatus only when the slices it actually inspects move.
+  const street = useTDStore((s) => s.street);
+  const productions = useTDStore((s) => s.productions);
+  const economy = useTDStore((s) => s.economy);
+  const time = useTDStore((s) => s.time);
+  const state = { street, productions, economy, time } as any;
   const advance = useTDStore((s) => s.advanceEra);
   const [expanded, setExpanded] = useState(true);
 

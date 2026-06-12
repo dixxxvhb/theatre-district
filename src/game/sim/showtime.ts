@@ -43,6 +43,8 @@ export class ShowtimeDirector {
   private lastPhase: DayPhase | null = null;
   /** Scene hook set by the canvas: fires the marquee-ignition cascade. */
   onIgnite: (() => void) | null = null;
+  /** Scene hook: a quick applause flash on box-office payoff. */
+  onApplause: (() => void) | null = null;
 
   /** Called once per sim tick, AFTER the store tick. */
   tick(): void {
@@ -136,6 +138,7 @@ export class ShowtimeDirector {
     if (total > 0) {
       s.addCash(total);
       pushToast(`Box office — ${titles.join(' · ')}`, 'money');
+      this.onApplause?.();
     }
   }
 
