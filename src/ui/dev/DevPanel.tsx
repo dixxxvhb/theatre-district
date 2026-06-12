@@ -17,6 +17,7 @@ export function DevPanel() {
   const addCash = useTDStore((s) => s.addCash);
   const skipDays = useTDStore((s) => s.skipDays);
   const setEra = useTDStore((s) => s.setEra);
+  const setTimeOfDay = useTDStore((s) => s.setTimeOfDay);
   const era = useTDStore((s) => s.street.era);
 
   const [meters, setMeters] = useState({ fps: 0, tps: 0 });
@@ -52,6 +53,19 @@ export function DevPanel() {
             onClick={() => setEra(e)}
           >
             {e + 1}
+          </button>
+        ))}
+      </div>
+      <div className="mb-2 flex items-center gap-1">
+        <span className="text-[10px] uppercase tracking-wider text-gray-400">Time</span>
+        {([
+          ['Noon', 0.15],
+          ['Dusk', 0.45],
+          ['Night', 0.65],
+          ['Late', 0.95],
+        ] as const).map(([label, t]) => (
+          <button key={label} className={btn} onClick={() => setTimeOfDay(t)}>
+            {label}
           </button>
         ))}
       </div>

@@ -43,6 +43,12 @@ export class StreetCamera {
     this.apply();
   }
 
+  setZoom(zoom: number): void {
+    this.zoom = Math.min(Math.max(zoom, CAMERA.MIN_ZOOM), CAMERA.MAX_ZOOM);
+    this.clamp();
+    this.apply();
+  }
+
   /** Per-frame: WASD pan. */
   update(): void {
     if (this.keys.size === 0) return;

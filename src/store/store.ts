@@ -28,6 +28,8 @@ export interface TDActions {
 
   /** Dev: jump to an era (street length follows; Session 8 adds the real gate). */
   setEra: (era: number) => void;
+  /** Dev: jump to a time of day (0..1) — lighting/pulse playtesting. */
+  setTimeOfDay: (t: number) => void;
   toggleBuzzOverlay: () => void;
 }
 
@@ -46,7 +48,26 @@ export const useTDStore = create<TDState & TDActions>((set, get) => ({
   ...initialTDState(),
 
   newGame: (districtName) =>
-    set({ ...initialTDState(), initialized: true, districtName: districtName.trim() || 'Theatre District' }),
+    set({
+      ...initialTDState(),
+      initialized: true,
+      districtName: districtName.trim() || 'Theatre District',
+      street: {
+        era: 0,
+        // The inheritance: one derelict playhouse mid-block on the north row.
+        buildings: [
+          {
+            id: 'inherited-playhouse',
+            kind: 'theatre_playhouse',
+            x: 8,
+            side: 'north',
+            constructionDaysLeft: 0,
+            condition: 0.2,
+          },
+        ],
+        decorations: [],
+      },
+    }),
 
   hydrate: (state) => set({ ...state }),
 
@@ -86,6 +107,14 @@ export const useTDStore = create<TDState & TDActions>((set, get) => ({
 
   setEra: (era) =>
     set((s) => ({ street: { ...s.street, era: Math.min(Math.max(era, 0), 4) } })),
+
+  setTimeOfDay: (t) =>
+    set((s) => ({
+      time: {
+        ...s.time,
+        tickOfDay: Math.min(Math.max(Math.round(t * TIME.TICKS_PER_DAY), 0), TIME.TICKS_PER_DAY - 1),
+      },
+    })),
 
   toggleBuzzOverlay: () =>
     set((s) => ({ settings: { ...s.settings, buzzOverlay: !s.settings.buzzOverlay } })),
