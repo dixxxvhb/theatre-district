@@ -1,691 +1,179 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
-import { useGameStore } from './store/gameStore';
-import { GameCanvas } from './game/canvas/GameCanvas';
-import { MainMenu } from './ui/layouts/MainMenu';
-import { PropertySelect } from './ui/layouts/PropertySelect';
-import { BuildPanel } from './ui/panels/BuildPanel';
-import { StaffPanel } from './ui/panels/StaffPanel';
-import { RehearsalView } from './ui/panels/RehearsalView';
-import { ShowPickerModal } from './ui/modals/ShowPickerModal';
-import { AuditionModal } from './ui/modals/AuditionModal';
-import { EventModal } from './ui/modals/EventModal';
-import { EndOfRunModal } from './ui/modals/EndOfRunModal';
-import { OpeningNightModal } from './ui/modals/OpeningNightModal';
-import { SaveLoadModal } from './ui/modals/SaveLoadModal';
-import { GameOverModal } from './ui/modals/GameOverModal';
-import { TonyAwardsModal } from './ui/modals/TonyAwardsModal';
-import { RunDashboard } from './ui/panels/RunDashboard';
-import { MoneyDisplay } from './ui/components/MoneyDisplay';
-import { NotificationToast } from './ui/components/NotificationToast';
-import { getFormattedDate } from './game/engine/TimeManager';
-import { saveGame, AUTOSAVE_INTERVAL_MS, AUTOSAVE_SLOT_ID } from './store/saveManager';
-import type { SpeedSetting, GamePhase } from './types';
+// Theatre District — app shell.
+// Street-first: title screen → the street, with the Production Desk and
+// build palette arriving in later sessions. The legacy Broadway Tycoon
+// shell was replaced in Session 1; its show-production systems return
+// through the Production Desk in Session 5.
 
-const SPEED_OPTIONS: { value: SpeedSetting; label: string }[] = [
-  { value: 'paused', label: '||' },
-  { value: 'normal', label: '1x' },
-  { value: 'fast', label: '2x' },
-  { value: 'ultra', label: '4x' },
-];
+import { useEffect, useState } from 'react';
+import { DistrictCanvas } from './game/render/DistrictCanvas';
+import { calendarLabel, dayPhase } from './game/sim/calendar';
+import type { Speed } from './game/sim/clock';
+import { mostRecentSave } from './store/saves';
+import { useTDStore } from './store/store';
+import { DevPanel, devEnabled } from './ui/dev/DevPanel';
+import { SaveMenu } from './ui/SaveMenu';
 
 const PHASE_LABELS: Record<string, string> = {
-  building: 'Build',
-  production: 'Show & Crew',
-  audition: 'Audition',
-  rehearsal: 'Rehearsal',
-  running: 'Running',
-  summary: 'Summary',
+  quiet: 'Quiet afternoon',
+  preshow: 'Pre-show',
+  curtain: 'Curtain up',
+  postshow: 'Post-show rush',
+  winddown: 'Wind-down',
 };
 
-const PHASE_FLOW: GamePhase[] = ['building', 'production', 'audition', 'rehearsal', 'running'];
+const SPEEDS: Array<{ key: Exclude<Speed, 'paused'>; label: string; hotkey: string }> = [
+  { key: 'normal', label: '1x', hotkey: '1' },
+  { key: 'fast', label: '2x', hotkey: '2' },
+  { key: 'ultra', label: '4x', hotkey: '3' },
+];
 
-function PhaseBreadcrumb() {
-  const currentPhase = useGameStore((s) => s.ui.currentPhase);
-  const idx = PHASE_FLOW.indexOf(currentPhase);
-  if (idx < 0) return null;
-
-  return (
-    <div className="flex items-center gap-1 px-4 py-1.5 bg-gray-950/60 border-b border-gray-800/30">
-      {PHASE_FLOW.map((phase, i) => {
-        const isActive = phase === currentPhase;
-        const isPast = i < idx;
-        return (
-          <div key={phase} className="flex items-center">
-            {i > 0 && (
-              <span className={`mx-1.5 text-[10px] ${isPast ? 'text-gray-600' : 'text-gray-800'}`}>
-                &rsaquo;
-              </span>
-            )}
-            <span
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full transition-all ${
-                isActive
-                  ? 'bg-amber-900/40 text-amber-300 border border-amber-700/40'
-                  : isPast
-                    ? 'text-emerald-600'
-                    : 'text-gray-700'
-              }`}
-            >
-              {PHASE_LABELS[phase] ?? phase}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Tiny keyboard shortcut badge */
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-block bg-gray-800 border border-gray-600 rounded px-1 py-px text-[10px] font-mono text-gray-400 leading-tight ml-1">
-      {children}
-    </span>
-  );
-}
-
-const SPEED_KEYS: Record<string, string> = {
-  paused: 'Space',
-  normal: '1',
-  fast: '2',
-  ultra: '3',
-};
-
-/** Secondary status row shown during rehearsal/running phases */
-function StatusBar() {
-  const currentPhase = useGameStore((s) => s.ui.currentPhase);
-  const shows = useGameStore((s) => s.shows);
-  const activeShowId = useGameStore((s) => s.activeShowId);
-  const performanceHistory = useGameStore((s) => s.performanceHistory);
-  const runDay = useGameStore((s) => s.runDay);
-
-  const activeShow = shows.find((s) => s.id === activeShowId);
-
-  if (currentPhase !== 'rehearsal' && currentPhase !== 'running') return null;
-  if (!activeShow) return null;
-
-  // Buzz bar color
-  const buzz = Math.round(activeShow.buzzScore);
-  const buzzColor =
-    buzz > 60 ? 'from-amber-500 to-yellow-300' :
-    buzz > 30 ? 'from-orange-500 to-amber-400' :
-               'from-red-600 to-orange-500';
-
-  // Quality color
-  const quality = activeShow.quality;
-  const qualityColor =
-    quality > 80 ? 'text-amber-300' :
-    quality > 60 ? 'text-emerald-400' :
-    quality > 40 ? 'text-orange-400' :
-                   'text-red-400';
-
-  // Last performance
-  const lastPerf = performanceHistory.length > 0
-    ? performanceHistory[performanceHistory.length - 1]
-    : null;
+function TitleScreen() {
+  const newGame = useTDStore((s) => s.newGame);
+  const hydrate = useTDStore((s) => s.hydrate);
+  const [name, setName] = useState('');
+  const [hasSave] = useState(() => mostRecentSave() !== null);
 
   return (
-    <div className="h-7 bg-gray-950/80 border-b border-gray-800/30 flex items-center gap-4 px-4 text-xs">
-      {/* Buzz meter */}
-      <div className="flex items-center gap-2">
-        <span className="text-gray-500 uppercase tracking-wider text-[10px]">Buzz</span>
-        <div className="w-20 h-2 bg-gray-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full bg-gradient-to-r ${buzzColor} rounded-full transition-all`}
-            style={{ width: `${buzz}%` }}
-          />
-        </div>
-        <span className="text-amber-300 font-mono text-[11px] w-5 text-right">{buzz}</span>
-      </div>
-
-      {/* Show quality (during running) */}
-      {currentPhase === 'running' && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-gray-500 uppercase tracking-wider text-[10px]">Quality</span>
-          <span className={`font-mono text-[11px] font-bold ${qualityColor}`}>{quality}</span>
-        </div>
-      )}
-
-      {/* Run counter or rehearsal progress */}
-      {currentPhase === 'running' ? (
-        <div className="flex items-center gap-1.5">
-          <span className="text-gray-500 text-[10px]">Day</span>
-          <span className="text-gray-300 font-mono text-[11px]">{runDay}</span>
-          <span className="text-gray-600 text-[10px]">of run</span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-1.5">
-          <span className="text-gray-500 uppercase tracking-wider text-[10px]">Rehearsal</span>
-          <span className="text-amber-300 font-mono text-[11px]">{Math.round(activeShow.rehearsalProgress)}%</span>
-        </div>
-      )}
-
-      {/* Last night attendance (running) */}
-      {currentPhase === 'running' && lastPerf && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-gray-500 text-[10px]">Last night</span>
-          <span className="text-gray-300 font-mono text-[11px]">
-            {lastPerf.attendance}/{lastPerf.capacity}
-          </span>
-          <span className={`font-mono text-[10px] ${
-            lastPerf.capacity > 0 && (lastPerf.attendance / lastPerf.capacity) > 0.7
-              ? 'text-emerald-400'
-              : 'text-orange-400'
-          }`}>
-            ({lastPerf.capacity > 0 ? Math.round((lastPerf.attendance / lastPerf.capacity) * 100) : 0}%)
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
-  const theaterName = useGameStore((s) => s.theaterName);
-  const day = useGameStore((s) => s.time.day);
-  const speed = useGameStore((s) => s.time.speed);
-  const isPaused = useGameStore((s) => s.time.isPaused);
-  const currentPhase = useGameStore((s) => s.ui.currentPhase);
-  const viewMode = useGameStore((s) => s.ui.viewMode);
-  const setViewMode = useGameStore((s) => s.setViewMode);
-  const setSpeed = useGameStore((s) => s.setSpeed);
-  const togglePause = useGameStore((s) => s.togglePause);
-  const isRenovating = useGameStore((s) => s.ui.isRenovating);
-
-  const dateStr = getFormattedDate(day);
-  const phaseLabel = PHASE_LABELS[currentPhase] ?? currentPhase;
-
-  return (
-    <>
-      <div className="h-12 bg-gray-950/90 border-b border-amber-900/30 flex items-center justify-between px-4 backdrop-blur-sm z-10 relative">
-        <div className="flex items-center gap-4">
-          <h1
-            className="text-amber-200 text-lg tracking-wide"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-          >
-            {theaterName || 'Theatre District'}
-          </h1>
-          <span className="text-gray-400 text-xs font-mono">{dateStr}</span>
-          <span className="text-gray-600 text-xs px-2 py-0.5 rounded bg-gray-900/60 border border-gray-800/40">
-            {phaseLabel}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {SPEED_OPTIONS.map((opt) => {
-            const isActive =
-              opt.value === 'paused'
-                ? isPaused
-                : speed === opt.value && !isPaused;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  if (opt.value === 'paused') {
-                    togglePause();
-                  } else {
-                    setSpeed(opt.value);
-                  }
-                }}
-                className={`px-2.5 py-1 text-xs rounded transition-all cursor-pointer border ${
-                  isActive
-                    ? 'bg-amber-900/40 border-amber-700/50 text-amber-200'
-                    : 'bg-gray-900/40 border-gray-800/40 text-gray-500 hover:text-gray-300 hover:border-gray-700/50'
-                }`}
-              >
-                {opt.label}
-                <Kbd>{SPEED_KEYS[opt.value]}</Kbd>
-              </button>
-            );
-          })}
-        </div>
-
-        {currentPhase !== 'menu' && currentPhase !== 'property_select' && currentPhase !== 'building' && (
+    <div className="flex h-screen flex-col items-center justify-center bg-[#0a0d18] text-center">
+      <h1
+        className="text-7xl font-bold tracking-widest text-[#d4a574]"
+        style={{ fontFamily: 'Georgia, serif', textShadow: '0 0 40px rgba(212,165,116,0.3)' }}
+      >
+        THEATRE
+      </h1>
+      <h2
+        className="mt-1 text-5xl font-bold tracking-[0.3em] text-[#b8860b]"
+        style={{ fontFamily: 'Georgia, serif' }}
+      >
+        DISTRICT
+      </h2>
+      <div className="mx-auto mt-6 h-px w-64 bg-gradient-to-r from-transparent via-[#d4a574] to-transparent" />
+      <div className="mt-8 flex flex-col items-center gap-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name your district"
+          className="w-64 rounded border border-amber-900/50 bg-gray-900/80 px-3 py-2 text-center text-amber-100 placeholder-gray-500 outline-none focus:border-amber-600"
+        />
+        <button
+          onClick={() => newGame(name)}
+          className="w-64 rounded border border-amber-700 bg-amber-950/60 px-4 py-2 text-amber-100 hover:bg-amber-900/60"
+        >
+          New District
+        </button>
+        {hasSave && (
           <button
-            onClick={() => useGameStore.getState().toggleRenovate()}
-            className={`px-3 py-1 text-xs rounded border transition-colors cursor-pointer ${
-              isRenovating
-                ? 'bg-amber-900/60 border-amber-600 text-amber-300'
-                : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
-            }`}
+            onClick={() => {
+              const state = mostRecentSave();
+              if (state) hydrate(state);
+            }}
+            className="w-64 rounded border border-gray-700 bg-gray-900/60 px-4 py-2 text-gray-300 hover:bg-gray-800"
           >
-            Renovate
-            <Kbd>R</Kbd>
+            Continue
           </button>
         )}
-
-        <div className="flex items-center gap-4">
-          <MoneyDisplay />
-
-          <button
-            onClick={() =>
-              setViewMode(viewMode === 'floorplan' ? 'isometric' : 'floorplan')
-            }
-            className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors cursor-pointer"
-            title="Toggle view mode (V)"
-          >
-            {viewMode === 'floorplan' ? 'Floor Plan' : 'Isometric'}
-            <Kbd>V</Kbd>
-          </button>
-
-          <button
-            onClick={onMenuClick}
-            className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors cursor-pointer"
-            title="Save/Load (Esc)"
-          >
-            Menu
-            <Kbd>Esc</Kbd>
-          </button>
-        </div>
       </div>
-      <StatusBar />
-    </>
+    </div>
   );
 }
 
-function TileInfo() {
-  const selectedTile = useGameStore((s) => s.ui.selectedTile);
-  const grid = useGameStore((s) => s.grid);
-  const properties = useGameStore((s) => s.properties);
-  const activePropertyId = useGameStore((s) => s.activePropertyId);
-  const demolishRoom = useGameStore((s) => s.demolishRoom);
-  const currentPhase = useGameStore((s) => s.ui.currentPhase);
-
-  if (!selectedTile) return null;
-
-  const cell = grid.cells[selectedTile.y * grid.width + selectedTile.x];
-  if (!cell) return null;
-
-  const activeProperty = properties.find((p) => p.id === activePropertyId);
-  const room = cell.roomId
-    ? activeProperty?.rooms.find((r) => r.id === cell.roomId)
-    : null;
+function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
+  const districtName = useTDStore((s) => s.districtName);
+  const day = useTDStore((s) => s.time.day);
+  const phase = useTDStore((s) => dayPhase(s.time.tickOfDay));
+  const cash = useTDStore((s) => s.economy.cash);
+  const speed = useTDStore((s) => s.time.speed);
+  const setSpeed = useTDStore((s) => s.setSpeed);
+  const togglePause = useTDStore((s) => s.togglePause);
 
   return (
-    <div className="absolute bottom-4 left-4 z-20 bg-gray-900/95 backdrop-blur-sm border border-amber-900/30 rounded-lg p-3 min-w-48 shadow-xl">
-      <div className="text-xs text-gray-500 mb-1">
-        Tile ({selectedTile.x}, {selectedTile.y})
+    <div className="relative z-10 flex h-12 items-center justify-between border-b border-amber-900/30 bg-gray-950/90 px-4 backdrop-blur-sm">
+      <div className="flex items-center gap-4">
+        <h1 className="text-lg tracking-wide text-amber-200" style={{ fontFamily: 'Georgia, serif' }}>
+          {districtName}
+        </h1>
+        <span className="font-mono text-xs text-gray-400">{calendarLabel(day)}</span>
+        <span className="rounded border border-gray-800/40 bg-gray-900/60 px-2 py-0.5 text-xs text-gray-500">
+          {PHASE_LABELS[phase]}
+        </span>
       </div>
-
-      {room ? (
-        <>
-          <div className="text-sm text-amber-200 font-semibold">{cell.roomType}</div>
-          {room.isConstructing && (
-            <div className="text-xs text-yellow-400 mt-1">
-              Under construction ({room.constructionDaysLeft} days left)
-            </div>
-          )}
-          {!room.isConstructing && (
-            <div className="text-xs text-emerald-400 mt-1">Complete</div>
-          )}
-          {currentPhase === 'building' && (
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-sm text-amber-200">${cash.toLocaleString()}</span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={togglePause}
+            title="Space"
+            className={`rounded px-2 py-1 text-xs ${
+              speed === 'paused'
+                ? 'bg-amber-800 text-amber-100'
+                : 'border border-gray-700 text-gray-400 hover:bg-gray-800'
+            }`}
+          >
+            {speed === 'paused' ? 'Paused' : 'Pause'}
+          </button>
+          {SPEEDS.map((s) => (
             <button
-              onClick={() => {
-                if (confirm('Demolish this room? You get 40% refund.')) {
-                  demolishRoom(room.id);
-                }
-              }}
-              className="mt-2 text-xs px-2 py-1 bg-red-900/30 border border-red-800/40 text-red-300 rounded hover:bg-red-900/50 transition-colors cursor-pointer"
+              key={s.key}
+              onClick={() => setSpeed(s.key)}
+              title={s.hotkey}
+              className={`rounded px-2 py-1 text-xs ${
+                speed === s.key
+                  ? 'bg-amber-800 text-amber-100'
+                  : 'border border-gray-700 text-gray-400 hover:bg-gray-800'
+              }`}
             >
-              Demolish (40% refund)
+              {s.label}
             </button>
-          )}
-        </>
-      ) : (
-        <div className="text-sm text-gray-500">Empty</div>
-      )}
-    </div>
-  );
-}
-
-function RenovateOverlay() {
-  const isRenovating = useGameStore((s) => s.ui.isRenovating);
-  if (!isRenovating) return null;
-
-  return (
-    <div className="absolute inset-0 z-40 flex">
-      <div className="flex-1 bg-black/30" onClick={() => useGameStore.getState().toggleRenovate()} />
-      <div className="w-80 bg-gray-950 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-3 border-b border-gray-800">
-          <span className="text-sm font-bold text-amber-300">Renovate</span>
-          <span className="text-[10px] text-amber-500/80">1.5x rush pricing</span>
-          <button
-            onClick={() => useGameStore.getState().toggleRenovate()}
-            className="text-gray-500 hover:text-white text-xs cursor-pointer"
-          >
-            Close
-          </button>
+          ))}
         </div>
-        <BuildPanel />
+        <button
+          onClick={onOpenSaves}
+          className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
+        >
+          Saves
+        </button>
       </div>
     </div>
   );
 }
 
-function PhaseTransitionOverlay() {
-  return <div className="phase-transition" />;
-}
+export default function App() {
+  const initialized = useTDStore((s) => s.initialized);
+  const [savesOpen, setSavesOpen] = useState(false);
 
-function PendingTonyAwards() {
-  const pendingTonyShowId = useGameStore((s) => s.pendingTonyShowId);
-  const shows = useGameStore((s) => s.shows);
-  const clearPendingTonyShowId = useGameStore((s) => s.clearPendingTonyShowId);
-
-  if (!pendingTonyShowId) return null;
-  const show = shows.find((s) => s.id === pendingTonyShowId);
-  if (!show) {
-    clearPendingTonyShowId();
-    return null;
-  }
-
-  return (
-    <TonyAwardsModal
-      showId={pendingTonyShowId}
-      showTitle={show.title}
-      onClose={clearPendingTonyShowId}
-    />
-  );
-}
-
-function App() {
-  const currentPhase = useGameStore((s) => s.ui.currentPhase);
-  const activeShowId = useGameStore((s) => s.activeShowId);
-  const events = useGameStore((s) => s.events);
-  const initialized = useGameStore((s) => s.initialized);
-  const isPaused = useGameStore((s) => s.time.isPaused);
-  const [showSaveLoad, setShowSaveLoad] = useState(false);
-  const prevPhaseRef = useRef(currentPhase);
-  const [showTransition, setShowTransition] = useState(false);
-
-  // Check for unresolved choice events
-  const hasUnresolvedEvent = events.some((e) => !e.resolved && e.choices.length > 1);
-
-  // Phase transition effect
+  // Global keyboard: Space = pause toggle, 1/2/3 = speeds.
   useEffect(() => {
-    if (prevPhaseRef.current !== currentPhase) {
-      prevPhaseRef.current = currentPhase;
-      setShowTransition(true);
-      const timer = setTimeout(() => setShowTransition(false), 400);
-      return () => clearTimeout(timer);
-    }
-  }, [currentPhase]);
-
-  // Autosave timer
-  useEffect(() => {
-    if (!initialized || currentPhase === 'menu') return;
-
-    const interval = setInterval(() => {
-      const state = useGameStore.getState();
-      if (!state.initialized || state.time.isPaused) return;
-      const serializable = state.getSerializableState();
-      saveGame(AUTOSAVE_SLOT_ID, serializable);
-    }, AUTOSAVE_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [initialized, currentPhase]);
-
-  // Pause when modals are open
-  useEffect(() => {
-    if ((showSaveLoad || hasUnresolvedEvent) && !isPaused && initialized) {
-      useGameStore.getState().setSpeed('paused');
-    }
-  }, [showSaveLoad, hasUnresolvedEvent, isPaused, initialized]);
-
-  // Global keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
+    const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const state = useGameStore.getState();
-
-      switch (e.key) {
-        case 'Escape':
-          if (showSaveLoad) {
-            setShowSaveLoad(false);
-          } else if (state.ui.isRenovating) {
-            state.toggleRenovate();
-            break;
-          } else if (state.ui.selectedRoomType) {
-            state.selectRoomType(null);
-          } else if (state.initialized && state.ui.currentPhase !== 'menu') {
-            setShowSaveLoad(true);
-          }
-          break;
-
-        case ' ':
-          e.preventDefault();
-          if (state.initialized && state.ui.currentPhase !== 'menu') {
-            state.togglePause();
-          }
-          break;
-
-        case '1':
-          if (state.initialized) state.setSpeed('normal');
-          break;
-        case '2':
-          if (state.initialized) state.setSpeed('fast');
-          break;
-        case '3':
-          if (state.initialized) state.setSpeed('ultra');
-          break;
-
-        case 'r':
-        case 'R':
-          if (state.initialized && state.ui.currentPhase !== 'menu' && state.ui.currentPhase !== 'property_select' && state.ui.currentPhase !== 'building') {
-            state.toggleRenovate();
-          }
-          break;
-
-        case 'v':
-        case 'V':
-          // Handled in GameCanvas already, but don't conflict
-          break;
-
-        case 'Delete':
-        case 'Backspace':
-          if (state.ui.currentPhase === 'building' && state.ui.selectedTile) {
-            const cell = state.grid.cells[state.ui.selectedTile.y * state.grid.width + state.ui.selectedTile.x];
-            if (cell?.roomId) {
-              if (confirm('Demolish this room? You get 40% refund.')) {
-                state.demolishRoom(cell.roomId);
-              }
-            }
-          }
-          break;
-      }
+      const { togglePause, setSpeed } = useTDStore.getState();
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePause();
+      } else if (e.key === '1') setSpeed('normal');
+      else if (e.key === '2') setSpeed('fast');
+      else if (e.key === '3') setSpeed('ultra');
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showSaveLoad]);
-
-  const handleOpenMenu = useCallback(() => {
-    setShowSaveLoad(true);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const handleCloseMenu = useCallback(() => {
-    setShowSaveLoad(false);
-  }, []);
-
-  // Menu screen
-  if (currentPhase === 'menu') {
+  if (!initialized) {
     return (
       <>
-        <MainMenu />
-        <NotificationToast />
+        <TitleScreen />
+        {devEnabled() && <DevPanel />}
       </>
     );
   }
 
-  // Property selection screen
-  if (currentPhase === 'property_select') {
-    return (
-      <>
-        <PropertySelect />
-        <NotificationToast />
-      </>
-    );
-  }
-
-  // Summary phase (end of run)
-  if (currentPhase === 'summary') {
-    return (
-      <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-        <TopBar onMenuClick={handleOpenMenu} />
-        <div className="flex-1 relative">
-          <GameCanvas />
-        </div>
-        <PendingTonyAwards />
-        <EndOfRunModal />
-        <RenovateOverlay />
-        {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransitionOverlay />}
-        <GameOverModal />
-        <NotificationToast />
-      </div>
-    );
-  }
-
-  // Building phase
-  if (currentPhase === 'building') {
-    return (
-      <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-        <TopBar onMenuClick={handleOpenMenu} />
-        <PhaseBreadcrumb />
-        <div className="flex-1 flex relative">
-          <div className="flex-1 relative">
-            <GameCanvas />
-            <TileInfo />
-          </div>
-          <BuildPanel />
-        </div>
-        {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransitionOverlay />}
-        <GameOverModal />
-        <NotificationToast />
-      </div>
-    );
-  }
-
-  // Production phase
-  if (currentPhase === 'production') {
-    if (!activeShowId) {
-      return (
-        <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-          <TopBar onMenuClick={handleOpenMenu} />
-          <PhaseBreadcrumb />
-          <div className="flex-1 relative">
-            <GameCanvas />
-          </div>
-          <ShowPickerModal />
-          {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-          {showTransition && <PhaseTransitionOverlay />}
-          <GameOverModal />
-          <NotificationToast />
-        </div>
-      );
-    }
-
-    return (
-      <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-        <TopBar onMenuClick={handleOpenMenu} />
-        <PhaseBreadcrumb />
-        <div className="flex-1 flex relative">
-          <div className="flex-1 relative">
-            <GameCanvas />
-            <TileInfo />
-          </div>
-          <StaffPanel />
-        </div>
-        <RenovateOverlay />
-        {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransitionOverlay />}
-        <GameOverModal />
-        <NotificationToast />
-      </div>
-    );
-  }
-
-  // Audition phase
-  if (currentPhase === 'audition') {
-    return (
-      <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-        <TopBar onMenuClick={handleOpenMenu} />
-        <PhaseBreadcrumb />
-        <div className="flex-1 relative">
-          <GameCanvas />
-        </div>
-        <AuditionModal />
-        <RenovateOverlay />
-        {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransitionOverlay />}
-        <GameOverModal />
-        <NotificationToast />
-      </div>
-    );
-  }
-
-  // Rehearsal phase
-  if (currentPhase === 'rehearsal') {
-    return (
-      <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-        <TopBar onMenuClick={handleOpenMenu} />
-        <PhaseBreadcrumb />
-        <div className="flex-1 flex relative">
-          <div className="flex-1 relative">
-            <GameCanvas />
-            <TileInfo />
-          </div>
-          <RehearsalView />
-        </div>
-        <OpeningNightModal />
-        <RenovateOverlay />
-        {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransitionOverlay />}
-        <GameOverModal />
-        <NotificationToast />
-      </div>
-    );
-  }
-
-  // Running phase
-  if (currentPhase === 'running') {
-    return (
-      <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-        <TopBar onMenuClick={handleOpenMenu} />
-        <PhaseBreadcrumb />
-        <div className="flex-1 flex relative">
-          <div className="flex-1 relative">
-            <GameCanvas />
-            <TileInfo />
-          </div>
-          <RunDashboard />
-        </div>
-        {hasUnresolvedEvent && <EventModal />}
-        <RenovateOverlay />
-        {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-        {showTransition && <PhaseTransitionOverlay />}
-        <GameOverModal />
-        <NotificationToast />
-      </div>
-    );
-  }
-
-  // All other phases: canvas + top bar
   return (
-    <div className="w-full h-full flex flex-col bg-gray-950 overflow-hidden">
-      <TopBar onMenuClick={handleOpenMenu} />
-      <PhaseBreadcrumb />
-      <div className="flex-1 relative">
-        <GameCanvas />
-        <TileInfo />
+    <div className="flex h-screen flex-col bg-[#0a0d18]">
+      <TopBar onOpenSaves={() => setSavesOpen(true)} />
+      <div className="relative flex-1">
+        <DistrictCanvas />
       </div>
-      {showSaveLoad && <SaveLoadModal onClose={handleCloseMenu} />}
-      {showTransition && <PhaseTransitionOverlay />}
-      <GameOverModal />
-      <NotificationToast />
+      {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
+      {devEnabled() && <DevPanel />}
     </div>
   );
 }
-
-export default App;
