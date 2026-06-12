@@ -21,6 +21,7 @@ export class GameRuntime {
         const dayRolled = useTDStore.getState().advanceTick();
         this.tickTimes.push(performance.now());
         if (dayRolled) {
+          useTDStore.getState().endOfDay();
           try {
             saveGame(AUTOSAVE_SLOT, snapshotTDState());
           } catch {

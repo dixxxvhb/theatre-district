@@ -112,9 +112,13 @@ export function decodeEnvelope(parsed: unknown): TDState | null {
   return isValid(state) ? state : null;
 }
 
-/** Forward-migrate older TD schemas. v1 is current — chain grows from here. */
+/** Forward-migrate older TD schemas. v1 is current — chain grows from here.
+ *  Pre-release saves may predate fields added during the build; fill defaults. */
 function migrate(state: TDState, _fromVersion: number): TDState {
-  return state;
+  return {
+    ...state,
+    upkeep: state.upkeep ?? { litter: {}, sweeperHired: false },
+  };
 }
 
 function isValid(state: TDState): boolean {

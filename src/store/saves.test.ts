@@ -46,6 +46,7 @@ function fixtureState(): TDState {
       ],
       decorations: [{ id: 'd1', kind: 'street_lamp', x: 3, y: 3 }],
     },
+    upkeep: { litter: { '5,3': 2 }, sweeperHired: true },
   };
 }
 
