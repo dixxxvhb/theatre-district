@@ -110,6 +110,8 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
         <span className="rounded border border-gray-800/40 bg-gray-900/60 px-2 py-0.5 text-xs text-gray-500">
           {PHASE_LABELS[phase]}
         </span>
+        <WeatherChip />
+        <DarkWeekChip />
       </div>
       <div className="flex items-center gap-3">
         <span className="font-mono text-sm text-amber-200">${cash.toLocaleString()}</span>
@@ -166,6 +168,39 @@ function BuildButton() {
     >
       Build
     </button>
+  );
+}
+
+function WeatherChip() {
+  const weather = useTDStore((s) => s.weather);
+  const label = weather === 'clear' ? '' : weather === 'rain' ? '☂ Rain' : '☼ Heat';
+  if (!label) return null;
+  return (
+    <span className="rounded border border-amber-900/40 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-200">
+      {label}
+    </span>
+  );
+}
+
+function DarkWeekChip() {
+  const dark = useTDStore((s) => s.darkWeekDays);
+  const era = useTDStore((s) => s.street.era);
+  const used = useTDStore((s) => s.patronRescueUsedEra);
+  const accept = useTDStore((s) => s.acceptPatronRescue);
+  if (dark === 0) return null;
+  const rescueAvailable = used !== era;
+  return (
+    <span className="flex items-center gap-1 rounded border border-red-900/40 bg-red-950/40 px-2 py-0.5 text-xs text-red-200">
+      Dark Week · day {dark}
+      {rescueAvailable && dark >= 3 && (
+        <button
+          onClick={accept}
+          className="ml-1 rounded border border-amber-700 bg-amber-950/60 px-1.5 py-0.5 text-[10px] text-amber-100 hover:bg-amber-900/60"
+        >
+          Accept patron rescue ($12k)
+        </button>
+      )}
+    </span>
   );
 }
 

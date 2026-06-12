@@ -293,6 +293,54 @@ export const UPGRADES = {
 export type UpgradeId = keyof typeof UPGRADES;
 
 // ---------------------------------------------------------------------------
+// SEASONS & WEATHER (Session 7)
+// ---------------------------------------------------------------------------
+export const SEASON_MOD: Record<string, { crowd: number; tickets: number }> = {
+  // Spring: Tony season — prestige weight up, critics circling. Standard crowd.
+  spring: { crowd: 1.0, tickets: 1.05 },
+  // Summer: tourist flood. Higher volume, taste blunter.
+  summer: { crowd: 1.25, tickets: 1.0 },
+  // Fall: new-season openings. Standard.
+  fall: { crowd: 1.0, tickets: 1.0 },
+  // Winter: the slump.
+  winter: { crowd: 0.75, tickets: 0.92 },
+};
+
+export type WeatherKind = 'clear' | 'rain' | 'heat';
+
+export const WEATHER = {
+  /** Daily roll: chances of rain/heat by season. Everything else is clear. */
+  CHANCES: {
+    spring: { rain: 0.18, heat: 0.0 },
+    summer: { rain: 0.12, heat: 0.28 },
+    fall: { rain: 0.22, heat: 0.0 },
+    winter: { rain: 0.18, heat: 0.0 },
+  } as Record<string, { rain: number; heat: number }>,
+  /** Crowd multipliers by weather kind. */
+  CROWD_MULT: { clear: 1.0, rain: 0.7, heat: 0.85 } as Record<WeatherKind, number>,
+  /** Indoor amenities surge in rain; carts surge in heat. */
+  BAR_SURGE_RAIN: 1.5,
+  CART_SURGE_HEAT: 1.55,
+} as const;
+
+// ---------------------------------------------------------------------------
+// DARK WEEK (Session 7)
+// ---------------------------------------------------------------------------
+export const DARK_WEEK = {
+  /** Triggers when cash ≤ this. */
+  TRIGGER_CASH: 0,
+  /** Days the street stays in Dark Week before the rescue offer arrives. */
+  GRACE_DAYS: 3,
+  /** Patron rescue grant (once per era). */
+  RESCUE_AMOUNT: 12_000,
+} as const;
+
+// ---------------------------------------------------------------------------
+// MAINTENANCE REPAIR (Session 7) — quick condition fix for the selection card.
+// ---------------------------------------------------------------------------
+export const REPAIR_COST_PER_POINT = 80; // $80 per missing percent of condition
+
+// ---------------------------------------------------------------------------
 // ECONOMY  [LOCKED anchors; exact curve numbers are tunable]
 // ---------------------------------------------------------------------------
 export const ECONOMY = {

@@ -172,6 +172,12 @@ export interface TDState {
   dayMods: { spawnMult: number; untilDay: number } | null;
   /** The Daily Playbill — newest first, last 7 days. */
   playbill: PlaybillEntry[];
+  /** Today's weather (Session 7). */
+  weather: 'clear' | 'rain' | 'heat';
+  /** Dark Week status (Session 7). 0 = not in Dark Week. */
+  darkWeekDays: number;
+  /** Per-era flag: has the patron rescue been used in this era? */
+  patronRescueUsedEra: number;
   settings: SettingsState;
 }
 

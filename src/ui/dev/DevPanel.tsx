@@ -73,9 +73,16 @@ export function DevPanel() {
           </button>
         ))}
       </div>
+      <div className="mb-2 flex items-center gap-1">
+        <span className="text-[10px] uppercase tracking-wider text-gray-400">Weather</span>
+        {(['clear', 'rain', 'heat'] as const).map((w) => (
+          <button key={w} className={btn} onClick={() => useTDStore.getState().setWeather(w)}>
+            {w}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap gap-1">
         <button className={btn} onClick={() => crowd.surge(40)}>Crowd surge</button>
-        <button className={stub} disabled title="Session 7">Weather</button>
         <button className={stub} disabled title="Session 6">Event</button>
       </div>
     </div>

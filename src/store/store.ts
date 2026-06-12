@@ -21,7 +21,8 @@ import {
 import { DIRECTOR_DECISIONS, pickDecision } from '../game/data/decisions';
 import { reviewShow, starString, verdictMomentum } from '../game/data/critics';
 import { eventById, rollDailyEvent } from '../game/sim/events';
-import { THEATRES } from '../game/config/balance';
+import { DARK_WEEK, REPAIR_COST_PER_POINT, THEATRES, WEATHER } from '../game/config/balance';
+import { seasonOf } from '../game/sim/calendar';
 import type { PlaybillEntry } from '../types/td';
 
 function pickById(id: string) {
@@ -116,6 +117,11 @@ export interface TDActions {
   resolveEvent: (choiceIndex: number) => void;
   publishPlaybill: (entry: { headline: string; lines: string[] }) => void;
 
+  /** Session 7. */
+  acceptPatronRescue: () => void;
+  repairBuilding: (id: string) => void;
+  setWeather: (weather: 'clear' | 'rain' | 'heat') => void;
+
   /** Dev: jump to an era (street length follows; Session 8 adds the real gate). */
   setEra: (era: number) => void;
   /** Dev: jump to a time of day (0..1) — lighting/pulse playtesting. */
@@ -136,6 +142,9 @@ export function initialTDState(): TDState {
     pendingEvent: null,
     dayMods: null,
     playbill: [],
+    weather: 'clear',
+    darkWeekDays: 0,
+    patronRescueUsedEra: -1,
     settings: { buzzOverlay: false },
   };
 }
@@ -546,6 +555,38 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
   publishPlaybill: (entry) =>
     set((s) => ({ playbill: addPlaybillEntry(s.playbill, s.time.day, entry) })),
 
+  acceptPatronRescue: () => {
+    const s = get();
+    if (s.patronRescueUsedEra === s.street.era) return;
+    s.addCash(DARK_WEEK.RESCUE_AMOUNT);
+    set((st) => ({
+      patronRescueUsedEra: st.street.era,
+      darkWeekDays: 0,
+      playbill: addPlaybillEntry(st.playbill, st.time.day, {
+        headline: `A patron steps in — $${DARK_WEEK.RESCUE_AMOUNT.toLocaleString()} arrives with a note`,
+        lines: ['The note asks only that you keep going. The lights come back up.'],
+      }),
+    }));
+  },
+
+  repairBuilding: (id) => {
+    const s = get();
+    const b = s.street.buildings.find((bb) => bb.id === id);
+    if (!b) return;
+    const missing = Math.round((1 - b.condition) * 100);
+    if (missing <= 0) return;
+    const cost = missing * REPAIR_COST_PER_POINT;
+    if (!s.spendCash(cost)) return;
+    set((st) => ({
+      street: {
+        ...st.street,
+        buildings: st.street.buildings.map((bb) => (bb.id === id ? { ...bb, condition: 1 } : bb)),
+      },
+    }));
+  },
+
+  setWeather: (weather) => set({ weather }),
+
   resolveDecision: (option) => {
     const s = get();
     const pending = s.pendingDecision;
@@ -742,6 +783,27 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
       if (next > 0.01) litter[key] = next;
     }
     const sweeperCost = s.upkeep.sweeperHired ? UPKEEP.SWEEPER_COST_PER_DAY : 0;
+
+    // Weather: roll for tomorrow's weather based on the upcoming season.
+    const nextDay = s.time.day + 1;
+    const season = seasonOf(nextDay);
+    const weatherChances = WEATHER.CHANCES[season] ?? { rain: 0.15, heat: 0 };
+    const wRoll = Math.random();
+    const weather: 'clear' | 'rain' | 'heat' =
+      wRoll < weatherChances.rain ? 'rain' : wRoll < weatherChances.rain + weatherChances.heat ? 'heat' : 'clear';
+
+    // Dark Week tracking: if cash ≤ trigger, increment; otherwise reset.
+    const projectedCash = s.economy.cash - sweeperCost - wagesTotal;
+    let darkWeekDays = projectedCash <= DARK_WEEK.TRIGGER_CASH ? s.darkWeekDays + 1 : 0;
+    // When grace period elapses and rescue is available, offer it (playbill).
+    if (darkWeekDays === DARK_WEEK.GRACE_DAYS && s.patronRescueUsedEra !== s.street.era) {
+      extraPlaybill.push({
+        day: nextDay,
+        headline: 'Dark Week — a patron offers a rescue',
+        lines: ['Check the offer in the top bar. They ask only that you keep going.'],
+      });
+    }
+
     // A landed decision OR a choice-event pauses the game (spec: auto-pause).
     const pauseFor = (newDecision && !s.pendingDecision) || (pendingEvent && !s.pendingEvent);
     set((st) => {
@@ -755,7 +817,9 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
         pendingEvent,
         dayMods,
         playbill,
-        economy: { ...st.economy, cash: st.economy.cash - sweeperCost - wagesTotal },
+        weather,
+        darkWeekDays,
+        economy: { ...st.economy, cash: projectedCash },
         time: pauseFor && st.time.speed !== 'paused' ? { ...st.time, speed: 'paused' } : st.time,
       };
     });
@@ -797,6 +861,9 @@ export function snapshotTDState(): TDState {
     pendingEvent: s.pendingEvent,
     dayMods: s.dayMods,
     playbill: s.playbill,
+    weather: s.weather,
+    darkWeekDays: s.darkWeekDays,
+    patronRescueUsedEra: s.patronRescueUsedEra,
     settings: s.settings,
   };
 }

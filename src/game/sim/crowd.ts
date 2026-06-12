@@ -9,8 +9,8 @@
 // straight street): walk along your sidewalk toward a target column, cross
 // the road only when your target is on the other side.
 
-import { AMENITIES, CROWD, ISO, TIME } from '../config/balance';
-import { dayPhase, isWeekend, type DayPhase } from './calendar';
+import { AMENITIES, CROWD, ISO, SEASON_MOD, TIME, WEATHER } from '../config/balance';
+import { dayPhase, isWeekend, seasonOf, type DayPhase } from './calendar';
 import { getBuzzField } from './buzzCache';
 import { gridToWorld } from '../render/iso';
 import { sidewalkRowFor } from '../street/topology';
@@ -207,7 +207,10 @@ export class CrowdSim {
 
     const weekend = isWeekend(s.time.day) ? CROWD.WEEKEND_SPAWN_MULT : 1;
     const eventMod = s.dayMods && s.dayMods.untilDay >= s.time.day ? s.dayMods.spawnMult : 1;
-    const expected = appeal * CROWD.SPAWN_PER_APPEAL * CROWD.PHASE_SPAWN[phase] * weekend * eventMod;
+    const season = SEASON_MOD[seasonOf(s.time.day)]?.crowd ?? 1;
+    const weather = WEATHER.CROWD_MULT[s.weather] ?? 1;
+    const expected =
+      appeal * CROWD.SPAWN_PER_APPEAL * CROWD.PHASE_SPAWN[phase] * weekend * eventMod * season * weather;
     let spawns = Math.floor(expected);
     if (this.random() < expected - spawns) spawns++;
     spawns = Math.min(spawns, CROWD.SPAWN_MAX_PER_TICK);

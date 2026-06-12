@@ -19,6 +19,7 @@ export function SelectionCard() {
   const select = useTDStore((s) => s.select);
   const demolish = useTDStore((s) => s.demolish);
   const restore = useTDStore((s) => s.restoreBuilding);
+  const repair = useTDStore((s) => s.repairBuilding);
   const openDesk = useTDStore((s) => s.openDesk);
   const [confirming, setConfirming] = useState(false);
 
@@ -99,6 +100,14 @@ export function SelectionCard() {
             onClick={() => openDesk(b.id)}
           >
             Production Desk
+          </button>
+        )}
+        {!blighted && !underConstruction && b.condition < 0.95 && (
+          <button
+            className={`${btn} border-gray-700 text-gray-300 hover:bg-gray-800`}
+            onClick={() => repair(b.id)}
+          >
+            Repair (${(Math.round((1 - b.condition) * 100) * 80).toLocaleString()})
           </button>
         )}
         {blighted && !underConstruction && (
