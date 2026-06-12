@@ -59,8 +59,8 @@ Space pause · 1/2/3 speed · B build menu · Esc/right-click cancel placement �
 ## Session Plan & Status
 Campaign runs Sessions 0–10 (see v2.1 spec). **Mandatory stops:** #1 after Session 0 (audit approval) · #2 after Session 4 (core-loop fun check + demo deploy). Anytime-stop on design/scope/feel questions.
 
-- ✅ **Session 0** (2026-06-12) — audit, pivot plan, CLAUDE.md, surface renames. → STOP #1
-- 🔲 Session 1 — foundation: iso grid/topology, camera, fixed-timestep loop + speeds + visibility pause, calendar, store reshape, save TD-v1 + slots + JSON export/import, dev panel, Vitest (calendar, save round-trip)
+- ✅ **Session 0** (2026-06-12) — audit, pivot plan, CLAUDE.md, surface renames. → STOP #1 PASSED (salvage-quarry · rename everywhere · /v3/ down)
+- ✅ **Session 1** (2026-06-12) — foundation shipped: balance.ts, SimClock (fixed 10t/s), calendar, topology, TD store, saves TD-v1 + JSON file export/import, new shell, camera, debug street view, dev panel, 33 unit tests. Legacy BT store/UI quarantined (unimported, compiles) until Session 5 folds the show systems in.
 - 🔲 Session 2 — Marquee Noir rendering kit; empty Dark Block street, beautifully
 - 🔲 Session 3 — placement UX + Buzz + overlay + litter (unit tests: spread/falloff/sum/diminishing)
 - 🔲 Session 4 — crowds, showtime rhythm, marquee ignition, core loop closes (4a/4b split allowed) → STOP #2, deploy demo
