@@ -19,6 +19,7 @@ export function SelectionCard() {
   const select = useTDStore((s) => s.select);
   const demolish = useTDStore((s) => s.demolish);
   const restore = useTDStore((s) => s.restoreBuilding);
+  const openDesk = useTDStore((s) => s.openDesk);
   const [confirming, setConfirming] = useState(false);
 
   if (!selectedId || (!building && !decoration)) return null;
@@ -92,6 +93,14 @@ export function SelectionCard() {
       )}
 
       <div className="mt-3 flex items-center gap-2">
+        {isTheatre(b.kind) && !blighted && !underConstruction && (
+          <button
+            className={`${btn} border-amber-700 bg-amber-950/60 text-amber-100 hover:bg-amber-900/60`}
+            onClick={() => openDesk(b.id)}
+          >
+            Production Desk
+          </button>
+        )}
         {blighted && !underConstruction && (
           <button
             disabled={cash < ECONOMY.DERELICT_RESTORE_COST}

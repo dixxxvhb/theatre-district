@@ -14,7 +14,7 @@ import { SAVES } from '../game/config/balance';
 import type { TDState } from '../types/td';
 
 export const SAVE_GAME_TAG = 'theatre-district';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const KEY_PREFIX = 'theatre-district-save-';
 const INDEX_KEY = 'theatre-district-save-index';
 export const AUTOSAVE_SLOT = 'autosave';
@@ -112,14 +112,19 @@ export function decodeEnvelope(parsed: unknown): TDState | null {
   return isValid(state) ? state : null;
 }
 
-/** Forward-migrate older TD schemas. v1 is current — chain grows from here.
- *  Pre-release saves may predate fields added during the build; fill defaults. */
-function migrate(state: TDState, _fromVersion: number): TDState {
-  return {
+/** Forward-migrate older TD schemas. v2 is current.
+ *  v1→v2: productions reshaped from the Session-4 SimpleShow to the full
+ *  Desk pipeline — old shows can't be carried (different anatomy), so v1
+ *  productions reset; street/cash/calendar survive untouched. */
+function migrate(state: TDState, fromVersion: number): TDState {
+  const next: TDState = {
     ...state,
     upkeep: state.upkeep ?? { litter: {}, sweeperHired: false },
     productions: state.productions ?? {},
+    pendingDecision: state.pendingDecision ?? null,
   };
+  if (fromVersion < 2) next.productions = {};
+  return next;
 }
 
 function isValid(state: TDState): boolean {

@@ -7,9 +7,23 @@
 
 import { create } from 'zustand';
 import type { Speed } from '../game/sim/clock';
-import { DECORATIONS, DEMOLISH_REFUND, ECONOMY, SHOWTIME, TIME, UPKEEP } from '../game/config/balance';
+import { DECORATIONS, DEMOLISH_REFUND, ECONOMY, PRODUCTION, TIME, UPKEEP, type UpgradeId } from '../game/config/balance';
 import { canPlaceBuilding, canPlaceDecoration, canPlaceStringLights, catalogEntry } from '../game/street/placement';
-import type { BuildingKind, DecorationKind, TDState } from '../types/td';
+import {
+  dailyWages,
+  draftOptions,
+  emptyProduction,
+  generateCandidates,
+  openingQuality,
+  upgradeCost,
+  upgradeEffects,
+} from '../game/production/logic';
+import { DIRECTOR_DECISIONS, pickDecision } from '../game/data/decisions';
+
+function pickById(id: string) {
+  return DIRECTOR_DECISIONS.find((d) => d.id === id) ?? null;
+}
+import type { BuildingKind, CastMember, DecorationKind, RoleSlot, TDState } from '../types/td';
 
 /** Transient UI state — lives in the single store but is never saved
  *  (snapshotTDState picks game fields explicitly). */
@@ -26,6 +40,8 @@ export interface UISlice {
     /** First anchor while placing string lights. */
     stringAnchor: { x: number; y: number } | null;
     paletteOpen: boolean;
+    /** Theatre whose Production Desk is open (full-screen overlay). */
+    deskTheatreId: string | null;
   };
   setTool: (tool: Tool) => void;
   select: (id: string | null) => void;
@@ -62,8 +78,20 @@ export interface TDActions {
   /** Day-rollover upkeep: construction, aging, litter, sweeper payroll. */
   endOfDay: () => void;
 
-  /** Showtime (Session 4 simplified; Session 5 replaces the source). */
-  assignShow: (theatreId: string, title: string) => void;
+  /** Production Desk pipeline (Session 5). */
+  openDesk: (theatreId: string | null) => void;
+  commission: (theatreId: string) => boolean;
+  chooseShow: (theatreId: string, optionIndex: number) => boolean;
+  refreshCandidates: (theatreId: string, slot: RoleSlot) => void;
+  castRole: (theatreId: string, slot: RoleSlot, candidate: CastMember) => boolean;
+  startRehearsals: (theatreId: string) => boolean;
+  openShow: (theatreId: string) => boolean;
+  closeShow: (theatreId: string) => void;
+  setTicketPrice: (theatreId: string, price: number) => void;
+  buyUpgrade: (theatreId: string, upgrade: UpgradeId) => boolean;
+  resolveDecision: (option: 'A' | 'B') => void;
+
+  /** Nightly bookkeeping (called by the showtime director). */
   recordNightly: (theatreId: string, attendance: number) => void;
   updateMomentum: (theatreId: string, momentum: number) => void;
 
@@ -83,20 +111,15 @@ export function initialTDState(): TDState {
     street: { era: 0, buildings: [], decorations: [] },
     upkeep: { litter: {}, sweeperHired: false },
     productions: {},
+    pendingDecision: null,
     settings: { buzzOverlay: false },
   };
-}
-
-/** Deterministic-ish quality roll for Session-4 auto-assigned shows. */
-function rollQuality(): number {
-  const [lo, hi] = SHOWTIME.QUALITY_RANGE;
-  return Math.round(lo + Math.random() * (hi - lo));
 }
 
 export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
   ...initialTDState(),
 
-  ui: { tool: null, selectedId: null, stringAnchor: null, paletteOpen: false },
+  ui: { tool: null, selectedId: null, stringAnchor: null, paletteOpen: false, deskTheatreId: null },
   setTool: (tool) =>
     set((s) => ({ ui: { ...s.ui, tool, stringAnchor: null, selectedId: tool ? null : s.ui.selectedId } })),
   select: (id) => set((s) => ({ ui: { ...s.ui, selectedId: id, tool: null, stringAnchor: null } })),
@@ -246,32 +269,200 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
     return true;
   },
 
-  assignShow: (theatreId, title) =>
-    set((s) => ({
+  openDesk: (theatreId) =>
+    set((s) => ({ ui: { ...s.ui, deskTheatreId: theatreId, selectedId: null, tool: null } })),
+
+  commission: (theatreId) => {
+    const s = get();
+    const theatre = s.street.buildings.find((b) => b.id === theatreId);
+    if (!theatre) return false;
+    const fx = upgradeEffects(theatre.upgrades);
+    const cost = Math.round(PRODUCTION.COMMISSION_COST * fx.commissionMult);
+    if (!s.spendCash(cost)) return false;
+    set((st) => ({
       productions: {
-        ...s.productions,
+        ...st.productions,
+        [theatreId]: { ...emptyProduction(), options: draftOptions() },
+      },
+    }));
+    return true;
+  },
+
+  chooseShow: (theatreId, optionIndex) => {
+    const s = get();
+    const p = s.productions[theatreId];
+    const theatre = s.street.buildings.find((b) => b.id === theatreId);
+    const show = p?.options?.[optionIndex];
+    if (!p || !show || !theatre) return false;
+    const fx = upgradeEffects(theatre.upgrades);
+    const rights = Math.round(show.rightsCost * (1 - fx.rightsDiscount));
+    if (!s.spendCash(rights)) return false;
+    set((st) => ({
+      productions: {
+        ...st.productions,
         [theatreId]: {
-          title,
-          quality: rollQuality(),
-          momentum: 1,
-          ticketPrice: SHOWTIME.DEFAULT_TICKET_PRICE,
-          lastAttendance: 0,
+          ...p,
+          stage: 'casting',
+          show,
+          options: undefined,
+          ticketPrice: PRODUCTION.REF_TICKET[theatre.kind] ?? 35,
         },
       },
-    })),
+    }));
+    return true;
+  },
+
+  refreshCandidates: (theatreId, slot) => {
+    const s = get();
+    const p = s.productions[theatreId];
+    const theatre = s.street.buildings.find((b) => b.id === theatreId);
+    if (!p || !theatre) return;
+    const fx = upgradeEffects(theatre.upgrades);
+    set((st) => ({
+      productions: {
+        ...st.productions,
+        [theatreId]: {
+          ...p,
+          candidates: { ...p.candidates, [slot]: generateCandidates(slot, fx.betterCandidates) },
+        },
+      },
+    }));
+  },
+
+  castRole: (theatreId, slot, candidate) => {
+    const s = get();
+    const p = s.productions[theatreId];
+    if (!p || p.stage !== 'casting') return false;
+    if (!s.spendCash(candidate.signingFee)) return false;
+    set((st) => ({
+      productions: {
+        ...st.productions,
+        [theatreId]: {
+          ...p,
+          cast: { ...p.cast, [slot]: candidate },
+          candidates: { ...p.candidates, [slot]: undefined },
+        },
+      },
+    }));
+    return true;
+  },
+
+  startRehearsals: (theatreId) => {
+    const s = get();
+    const p = s.productions[theatreId];
+    if (!p || p.stage !== 'casting' || !p.cast.lead) return false; // a show needs its lead
+    set((st) => ({
+      productions: { ...st.productions, [theatreId]: { ...p, stage: 'rehearsing', candidates: undefined } },
+    }));
+    return true;
+  },
+
+  openShow: (theatreId) => {
+    const s = get();
+    const p = s.productions[theatreId];
+    const theatre = s.street.buildings.find((b) => b.id === theatreId);
+    if (!p || !theatre || p.stage !== 'rehearsing' || p.readiness < PRODUCTION.OPEN_THRESHOLD) return false;
+    if (!s.spendCash(PRODUCTION.OPENING_COST)) return false;
+    const fx = upgradeEffects(theatre.upgrades);
+    set((st) => ({
+      productions: {
+        ...st.productions,
+        [theatreId]: { ...p, stage: 'running', quality: openingQuality(p, fx), runDays: 0, gross: 0, momentum: 1 },
+      },
+    }));
+    return true;
+  },
+
+  closeShow: (theatreId) =>
+    set((s) => {
+      const productions = { ...s.productions };
+      delete productions[theatreId];
+      return { productions };
+    }),
+
+  setTicketPrice: (theatreId, price) =>
+    set((s) => {
+      const p = s.productions[theatreId];
+      if (!p) return s;
+      const clamped = Math.round(Math.min(Math.max(price, 10), 150));
+      return { productions: { ...s.productions, [theatreId]: { ...p, ticketPrice: clamped } } };
+    }),
+
+  buyUpgrade: (theatreId, upgrade) => {
+    const s = get();
+    const theatre = s.street.buildings.find((b) => b.id === theatreId);
+    if (!theatre || theatre.upgrades?.includes(upgrade)) return false;
+    if (!s.spendCash(upgradeCost(upgrade))) return false;
+    set((st) => ({
+      street: {
+        ...st.street,
+        buildings: st.street.buildings.map((b) =>
+          b.id === theatreId ? { ...b, upgrades: [...(b.upgrades ?? []), upgrade] } : b,
+        ),
+      },
+    }));
+    return true;
+  },
+
+  resolveDecision: (option) => {
+    const s = get();
+    const pending = s.pendingDecision;
+    if (!pending) return;
+    const p = s.productions[pending.theatreId];
+    const decision = pickById(pending.decisionId);
+    if (p && decision) {
+      const effects = option === 'A' ? decision.optionA.effects : decision.optionB.effects;
+      let readiness = p.readiness;
+      let qualityNudge = p.qualityNudge;
+      for (const e of effects) {
+        if (e.chance !== undefined && Math.random() > e.chance) continue;
+        if (e.type === 'quality') qualityNudge += e.value;
+        else if (e.type === 'morale') qualityNudge += e.value * 0.6;
+        else if (e.type === 'readiness') readiness += e.value;
+        else if (e.type === 'days') readiness -= e.value * PRODUCTION.REHEARSAL_PER_DAY;
+        else if (e.type === 'cash') s.addCash(e.value);
+      }
+      set((st) => ({
+        productions: {
+          ...st.productions,
+          [pending.theatreId]: {
+            ...p,
+            readiness: Math.min(100, Math.max(0, readiness)),
+            qualityNudge,
+            usedDecisionIds: [...p.usedDecisionIds, pending.decisionId],
+          },
+        },
+      }));
+    }
+    // Un-pause: restore the speed the player was at before the modal.
+    set((st) => ({
+      pendingDecision: null,
+      time: st.time.speed === 'paused' ? { ...st.time, speed: st.time.prePauseSpeed } : st.time,
+    }));
+  },
 
   recordNightly: (theatreId, attendance) =>
     set((s) => {
-      const show = s.productions[theatreId];
-      if (!show) return s;
-      return { productions: { ...s.productions, [theatreId]: { ...show, lastAttendance: attendance } } };
+      const p = s.productions[theatreId];
+      if (!p) return s;
+      return { productions: { ...s.productions, [theatreId]: { ...p, lastAttendance: attendance } } };
     }),
 
   updateMomentum: (theatreId, momentum) =>
     set((s) => {
-      const show = s.productions[theatreId];
-      if (!show) return s;
-      return { productions: { ...s.productions, [theatreId]: { ...show, momentum } } };
+      const p = s.productions[theatreId];
+      if (!p) return s;
+      return {
+        productions: {
+          ...s.productions,
+          [theatreId]: {
+            ...p,
+            momentum,
+            runDays: p.runDays + 1,
+            gross: p.gross + p.lastAttendance * p.ticketPrice,
+          },
+        },
+      };
     }),
 
   toggleSweeper: () =>
@@ -289,12 +480,34 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
 
   endOfDay: () => {
     const s = get();
-    // Construction advances; operational buildings age.
-    const buildings = s.street.buildings.map((b) =>
-      b.constructionDaysLeft > 0
-        ? { ...b, constructionDaysLeft: b.constructionDaysLeft - 1 }
-        : { ...b, condition: Math.max(0, b.condition - UPKEEP.CONDITION_DECAY_PER_DAY) },
-    );
+    // Construction advances; operational buildings age (Backstage Complex slows it).
+    const buildings = s.street.buildings.map((b) => {
+      if (b.constructionDaysLeft > 0) return { ...b, constructionDaysLeft: b.constructionDaysLeft - 1 };
+      const fx = upgradeEffects(b.upgrades);
+      return { ...b, condition: Math.max(0, b.condition - UPKEEP.CONDITION_DECAY_PER_DAY * fx.decayMult) };
+    });
+
+    // Productions: rehearsals progress, casts get paid, decisions land.
+    const productions = { ...s.productions };
+    let wagesTotal = 0;
+    let newDecision = s.pendingDecision;
+    for (const [tid, p] of Object.entries(productions)) {
+      if (p.stage === 'rehearsing') {
+        const theatre = buildings.find((b) => b.id === tid);
+        const fx = upgradeEffects(theatre?.upgrades);
+        const rehearsalDays = p.rehearsalDays + 1;
+        const readiness = Math.min(100, p.readiness + PRODUCTION.REHEARSAL_PER_DAY * fx.rehearsalMult);
+        let next = { ...p, readiness, rehearsalDays };
+        if (!newDecision && rehearsalDays % PRODUCTION.DECISION_EVERY_DAYS === 0) {
+          const d = pickDecision(p.usedDecisionIds);
+          if (d) newDecision = { theatreId: tid, decisionId: d.id };
+        }
+        productions[tid] = next;
+        wagesTotal += dailyWages(p);
+      } else if (p.stage === 'running') {
+        wagesTotal += dailyWages(p);
+      }
+    }
     // Litter decays; the sweeper clears much more, for a daily fee.
     const clearedPerTile = s.upkeep.sweeperHired
       ? UPKEEP.LITTER_DECAY_PER_DAY + UPKEEP.SWEEPER_LITTER_PER_DAY
@@ -305,11 +518,16 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
       if (next > 0.01) litter[key] = next;
     }
     const sweeperCost = s.upkeep.sweeperHired ? UPKEEP.SWEEPER_COST_PER_DAY : 0;
-    set({
-      street: { ...s.street, buildings },
-      upkeep: { ...s.upkeep, litter },
-      economy: { ...s.economy, cash: s.economy.cash - sweeperCost },
-    });
+    // A landed decision pauses the game until answered (spec: auto-pause).
+    const pauseForDecision = newDecision && !s.pendingDecision;
+    set((st) => ({
+      street: { ...st.street, buildings },
+      upkeep: { ...st.upkeep, litter },
+      productions,
+      pendingDecision: newDecision,
+      economy: { ...st.economy, cash: st.economy.cash - sweeperCost - wagesTotal },
+      time: pauseForDecision && st.time.speed !== 'paused' ? { ...st.time, speed: 'paused' } : st.time,
+    }));
   },
 
   setEra: (era) =>
@@ -344,6 +562,7 @@ export function snapshotTDState(): TDState {
     street: s.street,
     upkeep: s.upkeep,
     productions: s.productions,
+    pendingDecision: s.pendingDecision,
     settings: s.settings,
   };
 }

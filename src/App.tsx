@@ -13,6 +13,8 @@ import { mostRecentSave } from './store/saves';
 import { useTDStore } from './store/store';
 import { BuildPalette } from './ui/BuildPalette';
 import { NotificationToast } from './ui/components/NotificationToast';
+import { DecisionModal } from './ui/desk/DecisionModal';
+import { ProductionDesk } from './ui/desk/ProductionDesk';
 import { SelectionCard } from './ui/SelectionCard';
 import { DevPanel, devEnabled } from './ui/dev/DevPanel';
 import { SaveMenu } from './ui/SaveMenu';
@@ -192,7 +194,8 @@ export default function App() {
         e.preventDefault();
         s.toggleBuzzOverlay();
       } else if (e.key === 'Escape') {
-        if (s.ui.tool) s.setTool(null);
+        if (s.ui.deskTheatreId) s.openDesk(null);
+        else if (s.ui.tool) s.setTool(null);
         else if (s.ui.selectedId) s.select(null);
       }
     };
@@ -231,6 +234,8 @@ export default function App() {
           </div>
         )}
       </div>
+      <ProductionDesk />
+      <DecisionModal />
       {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
       <NotificationToast />
       {devEnabled() && <DevPanel />}

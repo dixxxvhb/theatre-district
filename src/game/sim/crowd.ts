@@ -266,7 +266,10 @@ export class CrowdSim {
     const doorOf = (b: PlacedBuilding) => b.x + Math.floor(this.widthOf(b) / 2);
 
     if (this.need[i] === Need.SHOW && (phase === 'preshow' || phase === 'quiet')) {
-      const theatres = s.street.buildings.filter((b) => isTheatre(b.kind) && operational(b));
+      // Only theatres with a show actually on tonight draw a queue.
+      const theatres = s.street.buildings.filter(
+        (b) => isTheatre(b.kind) && operational(b) && s.productions[b.id]?.stage === 'running',
+      );
       if (theatres.length > 0) {
         const t = theatres[Math.floor(this.random() * theatres.length)];
         return { id: t.id, doorX: doorOf(t), side: t.side };
