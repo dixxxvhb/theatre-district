@@ -243,6 +243,16 @@ export const PRODUCTION = {
   DECISION_EVERY_DAYS: 4,
   /** Opening-night staging cost. */
   OPENING_COST: 2_000,
+  /** Lifecycle: cheap-ticket preview nights before the official opening. */
+  PREVIEW_DAYS: 3,
+  PREVIEW_PRICE_MULT: 0.5,
+  /** Forced closing: fill below this for FORCED_CLOSE_NIGHTS straight nights. */
+  FORCED_CLOSE_FILL: 0.1,
+  FORCED_CLOSE_NIGHTS: 5,
+  /** A run this long earns a farewell-crowd send-off when it closes. */
+  FAREWELL_RUN_DAYS: 28,
+  /** Daily chance of a street/theatre event. */
+  EVENT_CHANCE: 0.22,
   /** Quality formula weights (sum with base; clamped 0–100). */
   QUALITY_BASE: 22,
   QUALITY_SCRIPT_WEIGHT: 0.32,

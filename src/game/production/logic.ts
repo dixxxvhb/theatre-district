@@ -181,6 +181,8 @@ export function emptyProduction(): Production {
     rehearsalDays: 0,
     usedDecisionIds: [],
     qualityNudge: 0,
+    previewDays: 0,
+    belowParNights: 0,
     quality: 0,
     momentum: 1,
     ticketPrice: 0,

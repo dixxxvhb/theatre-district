@@ -235,6 +235,20 @@ function Running({ theatreId, production }: { theatreId: string; production: Pro
   return (
     <div className="mt-5">
       <ShowHeader production={production} note={`Open run — night ${production.runDays}`} />
+      {production.reviews && (
+        <div className={`${card} mt-3`}>
+          <div className="text-xs uppercase tracking-widest text-amber-700">Opening reviews</div>
+          <div className="mt-2 space-y-1 text-sm text-gray-300">
+            {production.reviews.map((r) => (
+              <div key={r.critic}>
+                <span className="text-amber-200">{r.critic}</span>{' '}
+                <span className="font-mono text-amber-400">{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</span>{' '}
+                <span className="text-gray-400">{r.line}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div className={card}>
           <div className="text-xs uppercase tracking-widest text-amber-700">The numbers</div>

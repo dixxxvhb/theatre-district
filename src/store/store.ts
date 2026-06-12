@@ -19,9 +19,26 @@ import {
   upgradeEffects,
 } from '../game/production/logic';
 import { DIRECTOR_DECISIONS, pickDecision } from '../game/data/decisions';
+import { reviewShow, starString, verdictMomentum } from '../game/data/critics';
+import { eventById, rollDailyEvent } from '../game/sim/events';
+import { THEATRES } from '../game/config/balance';
+import type { PlaybillEntry } from '../types/td';
 
 function pickById(id: string) {
   return DIRECTOR_DECISIONS.find((d) => d.id === id) ?? null;
+}
+
+const THEATRES_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(THEATRES).map(([k, v]) => [k, v.label]),
+);
+
+function addPlaybillEntry(
+  current: PlaybillEntry[],
+  day: number,
+  entry: { headline: string; lines: string[] },
+): PlaybillEntry[] {
+  const next = [{ day, headline: entry.headline, lines: entry.lines }, ...current];
+  return next.slice(0, 20); // keep last 20
 }
 import type { BuildingKind, CastMember, DecorationKind, RoleSlot, TDState } from '../types/td';
 
@@ -95,6 +112,10 @@ export interface TDActions {
   recordNightly: (theatreId: string, attendance: number) => void;
   updateMomentum: (theatreId: string, momentum: number) => void;
 
+  /** Lifecycle (Session 6). */
+  resolveEvent: (choiceIndex: number) => void;
+  publishPlaybill: (entry: { headline: string; lines: string[] }) => void;
+
   /** Dev: jump to an era (street length follows; Session 8 adds the real gate). */
   setEra: (era: number) => void;
   /** Dev: jump to a time of day (0..1) — lighting/pulse playtesting. */
@@ -112,6 +133,9 @@ export function initialTDState(): TDState {
     upkeep: { litter: {}, sweeperHired: false },
     productions: {},
     pendingDecision: null,
+    pendingEvent: null,
+    dayMods: null,
+    playbill: [],
     settings: { buzzOverlay: false },
   };
 }
@@ -361,23 +385,80 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
     const s = get();
     const p = s.productions[theatreId];
     const theatre = s.street.buildings.find((b) => b.id === theatreId);
-    if (!p || !theatre || p.stage !== 'rehearsing' || p.readiness < PRODUCTION.OPEN_THRESHOLD) return false;
-    if (!s.spendCash(PRODUCTION.OPENING_COST)) return false;
-    const fx = upgradeEffects(theatre.upgrades);
-    set((st) => ({
-      productions: {
-        ...st.productions,
-        [theatreId]: { ...p, stage: 'running', quality: openingQuality(p, fx), runDays: 0, gross: 0, momentum: 1 },
-      },
-    }));
-    return true;
+    if (!p || !theatre) return false;
+    if (p.stage === 'rehearsing') {
+      // Going into previews — discounted tickets, no critics, no opening cost.
+      if (p.readiness < PRODUCTION.OPEN_THRESHOLD) return false;
+      const fx = upgradeEffects(theatre.upgrades);
+      const previewPrice = Math.max(10, Math.round(p.ticketPrice * PRODUCTION.PREVIEW_PRICE_MULT));
+      const quality = openingQuality(p, fx);
+      set((st) => ({
+        productions: {
+          ...st.productions,
+          [theatreId]: {
+            ...p,
+            stage: 'previews',
+            quality,
+            ticketPrice: previewPrice,
+            runDays: 0,
+            previewDays: 0,
+            gross: 0,
+            momentum: 0.85,
+            belowParNights: 0,
+          },
+        },
+        playbill: addPlaybillEntry(st.playbill, st.time.day, {
+          headline: `${p.show?.title ?? 'A new show'} begins previews at ${theatre ? (THEATRES_LABEL[theatre.kind] ?? 'the house') : 'the house'}`,
+          lines: ['Cheap seats, sharp pencils. Final touches go live.'],
+        }),
+      }));
+      return true;
+    }
+    if (p.stage === 'previews') {
+      // Officially opening — full price, critics weigh in, momentum from verdict.
+      if (!s.spendCash(PRODUCTION.OPENING_COST)) return false;
+      const fx = upgradeEffects(theatre.upgrades);
+      const refPrice = PRODUCTION.REF_TICKET[theatre.kind] ?? 35;
+      const reviews = reviewShow(p, fx);
+      const verdict = verdictMomentum(reviews);
+      set((st) => ({
+        productions: {
+          ...st.productions,
+          [theatreId]: {
+            ...p,
+            stage: 'running',
+            ticketPrice: refPrice,
+            momentum: verdict,
+            reviews,
+            runDays: 0,
+            belowParNights: 0,
+          },
+        },
+        playbill: addPlaybillEntry(st.playbill, st.time.day, {
+          headline: `OPENING NIGHT — ${p.show?.title ?? 'A new show'} ${reviews.every((r) => r.stars >= 4) ? 'opens to raves' : reviews.every((r) => r.stars <= 2) ? 'pummeled by the critics' : 'opens'}`,
+          lines: reviews.map((r) => `${r.critic} ${starString(r.stars)} — ${r.line}`),
+        }),
+      }));
+      return true;
+    }
+    return false;
   },
 
   closeShow: (theatreId) =>
     set((s) => {
+      const p = s.productions[theatreId];
+      const theatre = s.street.buildings.find((b) => b.id === theatreId);
       const productions = { ...s.productions };
       delete productions[theatreId];
-      return { productions };
+      const farewell = p && (p.runDays >= PRODUCTION.FAREWELL_RUN_DAYS || p.gross > 80_000);
+      const headline = farewell
+        ? `Final curtain — ${p?.show?.title} takes its bow after ${p?.runDays} nights ($${(p?.gross ?? 0).toLocaleString()})`
+        : `${p?.show?.title ?? 'Show'} closes at ${theatre ? THEATRES_LABEL[theatre.kind] ?? 'the house' : 'the house'}`;
+      const lines = farewell ? ['Standing room only at the stage door. A run remembered.'] : [];
+      return {
+        productions,
+        playbill: p ? addPlaybillEntry(s.playbill, s.time.day, { headline, lines }) : s.playbill,
+      };
     }),
 
   setTicketPrice: (theatreId, price) =>
@@ -403,6 +484,67 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
     }));
     return true;
   },
+
+  resolveEvent: (choiceIndex) => {
+    const s = get();
+    const pending = s.pendingEvent;
+    if (!pending) return;
+    const event = eventById(pending.eventId);
+    if (!event) {
+      set({ pendingEvent: null });
+      return;
+    }
+    const choice = event.choices[choiceIndex] ?? event.choices[0];
+    let dayMods = s.dayMods;
+    for (const fx of choice.effects) {
+      switch (fx.type) {
+        case 'cash':
+          set((st) => ({ economy: { ...st.economy, cash: st.economy.cash + fx.value } }));
+          break;
+        case 'momentum':
+          if (pending.theatreId) {
+            const p = get().productions[pending.theatreId];
+            if (p) {
+              const next = Math.min(1.6, Math.max(0.55, p.momentum + fx.value));
+              set((st) => ({
+                productions: { ...st.productions, [pending.theatreId!]: { ...p, momentum: next } },
+              }));
+            }
+          }
+          break;
+        case 'qualityNudge':
+          if (pending.theatreId) {
+            const p = get().productions[pending.theatreId];
+            if (p) {
+              set((st) => ({
+                productions: { ...st.productions, [pending.theatreId!]: { ...p, qualityNudge: p.qualityNudge + fx.value } },
+              }));
+            }
+          }
+          break;
+        case 'litterBurst': {
+          const tiles: Array<{ x: number; y: number }> = [];
+          for (let i = 0; i < fx.value; i++) tiles.push({ x: Math.floor(Math.random() * Math.max(1, get().street.era * 8 + 16)), y: Math.random() < 0.5 ? 3 : 6 });
+          get().addLitter(tiles);
+          break;
+        }
+        case 'spawnMult':
+          dayMods = { spawnMult: fx.value, untilDay: s.time.day + (fx.days ?? 1) };
+          break;
+        case 'condition':
+          break; // reserved for later sessions
+      }
+    }
+    set((st) => ({
+      pendingEvent: null,
+      dayMods,
+      time: st.time.speed === 'paused' ? { ...st.time, speed: st.time.prePauseSpeed } : st.time,
+      playbill: addPlaybillEntry(st.playbill, st.time.day, { headline: event.title, lines: [event.description] }),
+    }));
+  },
+
+  publishPlaybill: (entry) =>
+    set((s) => ({ playbill: addPlaybillEntry(s.playbill, s.time.day, entry) })),
 
   resolveDecision: (option) => {
     const s = get();
@@ -487,25 +629,107 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
       return { ...b, condition: Math.max(0, b.condition - UPKEEP.CONDITION_DECAY_PER_DAY * fx.decayMult) };
     });
 
-    // Productions: rehearsals progress, casts get paid, decisions land.
+    // Productions: rehearsals progress, casts get paid, decisions land,
+    // previews auto-roll into the official opening after PREVIEW_DAYS.
     const productions = { ...s.productions };
     let wagesTotal = 0;
     let newDecision = s.pendingDecision;
+    const closeIds: string[] = [];
+    const extraPlaybill: PlaybillEntry[] = [];
     for (const [tid, p] of Object.entries(productions)) {
       if (p.stage === 'rehearsing') {
         const theatre = buildings.find((b) => b.id === tid);
         const fx = upgradeEffects(theatre?.upgrades);
         const rehearsalDays = p.rehearsalDays + 1;
         const readiness = Math.min(100, p.readiness + PRODUCTION.REHEARSAL_PER_DAY * fx.rehearsalMult);
-        let next = { ...p, readiness, rehearsalDays };
+        const next = { ...p, readiness, rehearsalDays };
         if (!newDecision && rehearsalDays % PRODUCTION.DECISION_EVERY_DAYS === 0) {
           const d = pickDecision(p.usedDecisionIds);
           if (d) newDecision = { theatreId: tid, decisionId: d.id };
         }
         productions[tid] = next;
         wagesTotal += dailyWages(p);
+      } else if (p.stage === 'previews') {
+        const previewDays = p.previewDays + 1;
+        wagesTotal += dailyWages(p);
+        if (previewDays >= PRODUCTION.PREVIEW_DAYS) {
+          // Auto-open: critics arrive tonight.
+          const theatre = buildings.find((b) => b.id === tid);
+          if (theatre) {
+            const fx = upgradeEffects(theatre.upgrades);
+            const refPrice = PRODUCTION.REF_TICKET[theatre.kind] ?? 35;
+            const reviews = reviewShow(p, fx);
+            const verdict = verdictMomentum(reviews);
+            productions[tid] = {
+              ...p,
+              stage: 'running',
+              previewDays,
+              ticketPrice: refPrice,
+              momentum: verdict,
+              reviews,
+              runDays: 0,
+              belowParNights: 0,
+            };
+            extraPlaybill.push({
+              day: s.time.day + 1,
+              headline: `OPENING NIGHT — ${p.show?.title ?? 'A new show'} ${reviews.every((r) => r.stars >= 4) ? 'opens to raves' : reviews.every((r) => r.stars <= 2) ? 'pummeled by the critics' : 'opens'}`,
+              lines: reviews.map((r) => `${r.critic} ${starString(r.stars)} — ${r.line}`),
+            });
+          }
+        } else {
+          productions[tid] = { ...p, previewDays };
+        }
       } else if (p.stage === 'running') {
         wagesTotal += dailyWages(p);
+        // Forced closing: too many bad nights in a row and the lights go down.
+        const theatre = buildings.find((b) => b.id === tid);
+        const cap = theatre ? THEATRES[theatre.kind as keyof typeof THEATRES].capacity : 1;
+        const fill = p.lastAttendance / Math.max(1, cap);
+        const belowParNights = fill < PRODUCTION.FORCED_CLOSE_FILL ? p.belowParNights + 1 : 0;
+        productions[tid] = { ...p, belowParNights };
+        if (belowParNights >= PRODUCTION.FORCED_CLOSE_NIGHTS) closeIds.push(tid);
+      }
+    }
+    for (const tid of closeIds) {
+      const p = productions[tid];
+      delete productions[tid];
+      extraPlaybill.push({
+        day: s.time.day + 1,
+        headline: `${p?.show?.title ?? 'Show'} forced to close`,
+        lines: ['Houses too thin to sustain. The notice goes up.'],
+      });
+    }
+
+    // Daily event roll.
+    const runningIds = Object.entries(productions)
+      .filter(([, p]) => p.stage === 'running' || p.stage === 'previews')
+      .map(([id]) => id);
+    let pendingEvent = s.pendingEvent;
+    let dayMods = s.dayMods && s.dayMods.untilDay > s.time.day ? s.dayMods : null;
+    if (!pendingEvent && !newDecision) {
+      const roll = rollDailyEvent({ ...s, productions } as TDState, runningIds, PRODUCTION.EVENT_CHANCE);
+      if (roll) {
+        if (roll.event.choices.length === 1) {
+          const fx = roll.event.choices[0].effects;
+          for (const e of fx) {
+            if (e.type === 'cash') {
+              set((st) => ({ economy: { ...st.economy, cash: st.economy.cash + e.value } }));
+            } else if (e.type === 'spawnMult') {
+              dayMods = { spawnMult: e.value, untilDay: s.time.day + (e.days ?? 1) };
+            } else if (e.type === 'momentum' && roll.theatreId) {
+              const target = productions[roll.theatreId];
+              if (target) {
+                productions[roll.theatreId] = {
+                  ...target,
+                  momentum: Math.min(1.6, Math.max(0.55, target.momentum + e.value)),
+                };
+              }
+            }
+          }
+          extraPlaybill.push({ day: s.time.day + 1, headline: roll.event.title, lines: [roll.event.description] });
+        } else {
+          pendingEvent = { eventId: roll.event.id, theatreId: roll.theatreId };
+        }
       }
     }
     // Litter decays; the sweeper clears much more, for a daily fee.
@@ -518,16 +742,23 @@ export const useTDStore = create<TDState & TDActions & UISlice>((set, get) => ({
       if (next > 0.01) litter[key] = next;
     }
     const sweeperCost = s.upkeep.sweeperHired ? UPKEEP.SWEEPER_COST_PER_DAY : 0;
-    // A landed decision pauses the game until answered (spec: auto-pause).
-    const pauseForDecision = newDecision && !s.pendingDecision;
-    set((st) => ({
-      street: { ...st.street, buildings },
-      upkeep: { ...st.upkeep, litter },
-      productions,
-      pendingDecision: newDecision,
-      economy: { ...st.economy, cash: st.economy.cash - sweeperCost - wagesTotal },
-      time: pauseForDecision && st.time.speed !== 'paused' ? { ...st.time, speed: 'paused' } : st.time,
-    }));
+    // A landed decision OR a choice-event pauses the game (spec: auto-pause).
+    const pauseFor = (newDecision && !s.pendingDecision) || (pendingEvent && !s.pendingEvent);
+    set((st) => {
+      let playbill = st.playbill;
+      for (const entry of extraPlaybill) playbill = addPlaybillEntry(playbill, entry.day, entry);
+      return {
+        street: { ...st.street, buildings },
+        upkeep: { ...st.upkeep, litter },
+        productions,
+        pendingDecision: newDecision,
+        pendingEvent,
+        dayMods,
+        playbill,
+        economy: { ...st.economy, cash: st.economy.cash - sweeperCost - wagesTotal },
+        time: pauseFor && st.time.speed !== 'paused' ? { ...st.time, speed: 'paused' } : st.time,
+      };
+    });
   },
 
   setEra: (era) =>
@@ -563,6 +794,9 @@ export function snapshotTDState(): TDState {
     upkeep: s.upkeep,
     productions: s.productions,
     pendingDecision: s.pendingDecision,
+    pendingEvent: s.pendingEvent,
+    dayMods: s.dayMods,
+    playbill: s.playbill,
     settings: s.settings,
   };
 }

@@ -206,7 +206,8 @@ export class CrowdSim {
     appeal = Math.sqrt(appeal); // diminishing street-level returns
 
     const weekend = isWeekend(s.time.day) ? CROWD.WEEKEND_SPAWN_MULT : 1;
-    const expected = appeal * CROWD.SPAWN_PER_APPEAL * CROWD.PHASE_SPAWN[phase] * weekend;
+    const eventMod = s.dayMods && s.dayMods.untilDay >= s.time.day ? s.dayMods.spawnMult : 1;
+    const expected = appeal * CROWD.SPAWN_PER_APPEAL * CROWD.PHASE_SPAWN[phase] * weekend * eventMod;
     let spawns = Math.floor(expected);
     if (this.random() < expected - spawns) spawns++;
     spawns = Math.min(spawns, CROWD.SPAWN_MAX_PER_TICK);

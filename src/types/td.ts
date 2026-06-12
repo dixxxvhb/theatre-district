@@ -94,7 +94,7 @@ export interface SettingsState {
 
 // --- Production Desk (Session 5) ---------------------------------------------
 
-export type ProductionStage = 'commissioning' | 'casting' | 'rehearsing' | 'running';
+export type ProductionStage = 'commissioning' | 'casting' | 'rehearsing' | 'previews' | 'running';
 
 export type RoleSlot = 'lead' | 'second' | 'featured' | 'ensemble';
 
@@ -141,6 +141,12 @@ export interface Production {
   /** Cumulative box office for this show's run. */
   gross: number;
   runDays: number;
+  /** Lifecycle (Session 6): cheap-ticket preview nights before opening. */
+  previewDays: number;
+  /** Opening-night verdicts from the three critics. */
+  reviews?: Array<{ critic: string; stars: number; line: string }>;
+  /** Consecutive nights under the forced-closing fill threshold. */
+  belowParNights: number;
 }
 
 /** A pending director decision — gameplay-pausing (spec: decision modals auto-pause). */
@@ -160,5 +166,17 @@ export interface TDState {
   productions: Record<string, Production>;
   /** Auto-pauses the game until answered. */
   pendingDecision: PendingDecision | null;
+  /** Daily-event modal (auto-pauses); passive events apply instantly. */
+  pendingEvent: { eventId: string; theatreId?: string } | null;
+  /** Temporary street-wide modifiers from events (festival crowds etc.). */
+  dayMods: { spawnMult: number; untilDay: number } | null;
+  /** The Daily Playbill — newest first, last 7 days. */
+  playbill: PlaybillEntry[];
   settings: SettingsState;
+}
+
+export interface PlaybillEntry {
+  day: number;
+  headline: string;
+  lines: string[];
 }

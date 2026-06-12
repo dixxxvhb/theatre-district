@@ -14,7 +14,9 @@ import { useTDStore } from './store/store';
 import { BuildPalette } from './ui/BuildPalette';
 import { NotificationToast } from './ui/components/NotificationToast';
 import { DecisionModal } from './ui/desk/DecisionModal';
+import { EventModal } from './ui/desk/EventModal';
 import { ProductionDesk } from './ui/desk/ProductionDesk';
+import { Playbill } from './ui/Playbill';
 import { SelectionCard } from './ui/SelectionCard';
 import { DevPanel, devEnabled } from './ui/dev/DevPanel';
 import { SaveMenu } from './ui/SaveMenu';
@@ -139,6 +141,7 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
           ))}
         </div>
         <BuildButton />
+        <PlaybillButton />
         <button
           onClick={onOpenSaves}
           className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
@@ -166,12 +169,32 @@ function BuildButton() {
   );
 }
 
+function PlaybillButton() {
+  const count = useTDStore((s) => s.playbill.length);
+  // Open via parent — emit a global event since this lives inside TopBar's tree.
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new CustomEvent('td:open-playbill'))}
+      title="P"
+      className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
+    >
+      Playbill{count > 0 ? ` (${Math.min(count, 99)})` : ''}
+    </button>
+  );
+}
+
 export default function App() {
   const initialized = useTDStore((s) => s.initialized);
   const paletteOpen = useTDStore((s) => s.ui.paletteOpen);
   const [savesOpen, setSavesOpen] = useState(false);
+  const [playbillOpen, setPlaybillOpen] = useState(false);
   const [hoverBuzz, setHoverBuzz] = useState<string | null>(null);
   const [thought, setThought] = useState<PeepThought | null>(null);
+  useEffect(() => {
+    const onOpen = () => setPlaybillOpen(true);
+    window.addEventListener('td:open-playbill', onOpen);
+    return () => window.removeEventListener('td:open-playbill', onOpen);
+  }, []);
   const onHoverBuzz = useCallback((label: string | null) => setHoverBuzz(label), []);
   const onThought = useCallback((t: PeepThought) => {
     setThought(t);
@@ -193,6 +216,8 @@ export default function App() {
       else if (e.key === 'Tab') {
         e.preventDefault();
         s.toggleBuzzOverlay();
+      } else if (e.key === 'p' || e.key === 'P') {
+        window.dispatchEvent(new CustomEvent('td:open-playbill'));
       } else if (e.key === 'Escape') {
         if (s.ui.deskTheatreId) s.openDesk(null);
         else if (s.ui.tool) s.setTool(null);
@@ -236,6 +261,8 @@ export default function App() {
       </div>
       <ProductionDesk />
       <DecisionModal />
+      <EventModal />
+      {playbillOpen && <Playbill onClose={() => setPlaybillOpen(false)} />}
       {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
       <NotificationToast />
       {devEnabled() && <DevPanel />}

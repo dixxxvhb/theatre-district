@@ -122,6 +122,9 @@ function migrate(state: TDState, fromVersion: number): TDState {
     upkeep: state.upkeep ?? { litter: {}, sweeperHired: false },
     productions: state.productions ?? {},
     pendingDecision: state.pendingDecision ?? null,
+    pendingEvent: state.pendingEvent ?? null,
+    dayMods: state.dayMods ?? null,
+    playbill: state.playbill ?? [],
   };
   if (fromVersion < 2) next.productions = {};
   return next;

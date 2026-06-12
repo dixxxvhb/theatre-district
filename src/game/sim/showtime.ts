@@ -16,6 +16,8 @@ import { crowd } from './crowd';
 import { useTDStore } from '../../store/store';
 import { dayPhase, type DayPhase } from './calendar';
 import { upgradeEffects } from '../production/logic';
+import { genreAppetite, isGouging, mixPriceTolerance, priceDemand } from './demographics';
+import { PRODUCTION } from '../config/balance';
 import { pushToast } from '../../ui/components/NotificationToast';
 import { sidewalkRowFor } from '../street/topology';
 
@@ -79,15 +81,22 @@ export class ShowtimeDirector {
     const { field, cols } = getBuzzField(s.street, s.upkeep);
     for (const t of this.showingTheatres(s)) {
       const p = s.productions[t.id];
-      if (!p) continue;
+      if (!p || !p.show) continue;
       const fx = upgradeEffects(t.upgrades);
       const capacity = Math.round(THEATRES[t.kind as keyof typeof THEATRES].capacity * fx.capacityMult);
       const doorX = t.x + Math.floor(THEATRES[t.kind as keyof typeof THEATRES].width / 2);
       const doorY = sidewalkRowFor(t.side);
       const doorBuzz = field[doorY * cols + doorX] ?? 0;
 
+      // Demographics + ticket elasticity scale the buzz-driven walk-ins.
+      const refPrice = PRODUCTION.REF_TICKET[t.kind] ?? 35;
+      const tolerance = mixPriceTolerance(s.time.day);
+      const appetite = genreAppetite(s.time.day, p.show.genre);
+      const elasticity = priceDemand(p.ticketPrice, refPrice, tolerance);
+      const effectiveBuzz = (doorBuzz + fx.attendanceBonus) * appetite * elasticity;
+
       const { admitted } = crowd.admit(t.id, capacity);
-      const attendance = attendanceFor(admitted, doorBuzz + fx.attendanceBonus, capacity, p.momentum);
+      const attendance = attendanceFor(admitted, effectiveBuzz, capacity, p.momentum);
       s.recordNightly(t.id, attendance);
     }
   }
@@ -100,6 +109,8 @@ export class ShowtimeDirector {
       if (!p || !p.show || p.lastAttendance === 0) continue;
       const fx = upgradeEffects(t.upgrades);
       const capacity = Math.round(THEATRES[t.kind as keyof typeof THEATRES].capacity * fx.capacityMult);
+      const refPrice = PRODUCTION.REF_TICKET[t.kind] ?? 35;
+      const tolerance = mixPriceTolerance(s.time.day);
       // VIP lounge premium rides on top of the set price; the house bar takes
       // its cut of the whole night.
       const perTicket = p.ticketPrice + fx.ticketPremium;
@@ -109,7 +120,15 @@ export class ShowtimeDirector {
 
       const fillRate = p.lastAttendance / capacity;
       const goodShow = p.quality >= 62;
-      s.updateMomentum(t.id, nextMomentum(p.momentum, p.quality, fillRate));
+      let momentum = nextMomentum(p.momentum, p.quality, fillRate);
+      // Restrooms upgrade removes the quiet drag on word of mouth.
+      if (fx.wordOfMouthFloor) momentum = Math.max(momentum, 0.85);
+      // Green-room upgrade slows momentum decay.
+      momentum = p.momentum + (momentum - p.momentum) * fx.momentumDecayMult;
+      // Gouging penalty — overprice a hit and word of mouth dies for it.
+      if (isGouging(p.ticketPrice, refPrice, tolerance)) momentum -= 0.04;
+      momentum = Math.min(1.6, Math.max(0.55, momentum));
+      s.updateMomentum(t.id, momentum);
 
       const doorX = t.x + Math.floor(THEATRES[t.kind as keyof typeof THEATRES].width / 2);
       crowd.release(t.id, doorX, t.side, goodShow);
