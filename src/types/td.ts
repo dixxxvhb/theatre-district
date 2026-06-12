@@ -80,6 +80,12 @@ export interface StreetState {
   decorations: PlacedDecoration[];
 }
 
+export interface UpkeepState {
+  /** Litter units per tile, keyed "x,y". Crowds drop it; sweepers clear it. */
+  litter: Record<string, number>;
+  sweeperHired: boolean;
+}
+
 export interface SettingsState {
   buzzOverlay: boolean;
 }
@@ -90,5 +96,6 @@ export interface TDState {
   time: TimeState;
   economy: EconomyState;
   street: StreetState;
+  upkeep: UpkeepState;
   settings: SettingsState;
 }

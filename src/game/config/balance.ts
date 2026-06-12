@@ -84,6 +84,90 @@ export const FOOTPRINTS = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// BUILD CATALOG
+// Costs, build times, footprints, and buzz emission per placeable kind.
+// Footprint width = columns along the street; theatres/amenities are 3 deep
+// (full lot), decoration is 1×1. Buzz emission feeds the locked Buzz spec.
+// ---------------------------------------------------------------------------
+export interface CatalogEntry {
+  label: string;
+  cost: number;
+  buildDays: number;
+  width: number;
+  buzz: number;
+  /** Theatre seats (theatres only) — the box-office ceiling. */
+  capacity?: number;
+}
+
+export const THEATRES = {
+  theatre_playhouse: { label: 'Playhouse', cost: 28_000, buildDays: 5, width: 3, buzz: 8, capacity: 120 },
+  theatre_midhouse:  { label: 'Mid-house', cost: 70_000, buildDays: 8, width: 4, buzz: 10, capacity: 320 },
+  theatre_grand:     { label: 'Grand Theatre', cost: 160_000, buildDays: 12, width: 6, buzz: 14, capacity: 700 },
+} as const satisfies Record<string, CatalogEntry>;
+
+export const AMENITIES = {
+  food_cart:   { label: 'Food Cart', cost: 2_500, buildDays: 1, width: 2, buzz: 2.5 },
+  cafe:        { label: 'Cafe', cost: 8_000, buildDays: 2, width: 2, buzz: 3 },
+  bar:         { label: 'Bar', cost: 9_500, buildDays: 2, width: 2, buzz: 3.5 },
+  gift_shop:   { label: 'Gift Shop', cost: 7_000, buildDays: 2, width: 2, buzz: 2.5 },
+  restaurant:  { label: 'Restaurant', cost: 14_000, buildDays: 3, width: 3, buzz: 4 },
+  late_lounge: { label: 'Late Lounge', cost: 16_000, buildDays: 3, width: 3, buzz: 4.5 },
+} as const satisfies Record<string, CatalogEntry>;
+
+export const DECORATIONS = {
+  street_lamp:   { label: 'Street Lamp', cost: 350, buzz: 1.2 },
+  bench:         { label: 'Bench', cost: 400, buzz: 0.8 },
+  planter:       { label: 'Planter', cost: 250, buzz: 0.8 },
+  tree:          { label: 'Tree', cost: 600, buzz: 1.4 },
+  poster_board:  { label: 'Poster Board', cost: 650, buzz: 1.2 },
+  banner_pole:   { label: 'Banner Pole', cost: 700, buzz: 1.0 },
+  string_lights: { label: 'String Lights', cost: 900, buzz: 1.8 },
+  newsstand:     { label: 'Newsstand', cost: 1_200, buzz: 1.2 },
+  phone_booth:   { label: 'Phone Booth', cost: 900, buzz: 0.8 },
+  steam_grate:   { label: 'Steam Grate', cost: 500, buzz: 0.6 },
+  fountain:      { label: 'Fountain', cost: 4_500, buzz: 2.2 },
+  billboard:     { label: 'Billboard', cost: 3_200, buzz: 1.8 },
+} as const satisfies Record<string, { label: string; cost: number; buzz: number }>;
+
+/** Demolishing a building refunds this fraction of its cost. Decoration: none. */
+export const DEMOLISH_REFUND = 0.25;
+
+// ---------------------------------------------------------------------------
+// BUZZ  [LOCKED spec — see CLAUDE.md]
+// ---------------------------------------------------------------------------
+export const BUZZ = {
+  /** Spread radius in tiles (Chebyshev rings); zero at SPREAD+1. */
+  SPREAD: 3,
+  /** Linear falloff per ring: 1.0, 0.75, 0.5, 0.25, then 0. */
+  FALLOFF: [1.0, 0.75, 0.5, 0.25] as const,
+  /** Decoration diminishing returns: per tile, decoration contributions are
+   *  sorted strongest-first and weighted by DIMINISH^index. Buildings don't
+   *  diminish. Kills the carpet-the-street-in-lamps exploit. */
+  DIMINISH: 0.6,
+  /** Negative emission from a neglected building (condition below threshold). */
+  NEGLECT_EMISSION: -4,
+  NEGLECT_THRESHOLD: 0.4,
+  /** Derelict (unrestored) buildings always emit this. */
+  DERELICT_EMISSION: -4,
+  /** Negative buzz per unit of litter on a tile (litter does not spread). */
+  LITTER_PER_UNIT: -0.6,
+  LITTER_MAX_UNITS: 5,
+} as const;
+
+// ---------------------------------------------------------------------------
+// MAINTENANCE & LITTER
+// ---------------------------------------------------------------------------
+export const UPKEEP = {
+  /** Daily condition decay for operational buildings. ~1 season to neglect. */
+  CONDITION_DECAY_PER_DAY: 0.012,
+  /** Daily litter decay without a sweeper (wind, rain, civic miracle). */
+  LITTER_DECAY_PER_DAY: 0.25,
+  /** Street crew: clears this much litter per tile per day, costs cash daily. */
+  SWEEPER_LITTER_PER_DAY: 2,
+  SWEEPER_COST_PER_DAY: 120,
+} as const;
+
+// ---------------------------------------------------------------------------
 // ECONOMY  [LOCKED anchors; exact curve numbers are tunable]
 // ---------------------------------------------------------------------------
 export const ECONOMY = {
