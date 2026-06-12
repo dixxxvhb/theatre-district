@@ -15,7 +15,9 @@ import { getBuzzField } from './buzzCache';
 import { crowd } from './crowd';
 import { useTDStore } from '../../store/store';
 import { dayPhase, type DayPhase } from './calendar';
-import { generateShowTitle } from '../data/shows';
+import { upgradeEffects } from '../production/logic';
+import { genreAppetite, isGouging, mixPriceTolerance, priceDemand } from './demographics';
+import { PRODUCTION } from '../config/balance';
 import { pushToast } from '../../ui/components/NotificationToast';
 import { sidewalkRowFor } from '../street/topology';
 
@@ -41,6 +43,8 @@ export class ShowtimeDirector {
   private lastPhase: DayPhase | null = null;
   /** Scene hook set by the canvas: fires the marquee-ignition cascade. */
   onIgnite: (() => void) | null = null;
+  /** Scene hook: a quick applause flash on box-office payoff. */
+  onApplause: (() => void) | null = null;
 
   /** Called once per sim tick, AFTER the store tick. */
   tick(): void {
@@ -66,26 +70,35 @@ export class ShowtimeDirector {
     return s.street.buildings.filter((b) => isTheatre(b.kind) && b.constructionDaysLeft === 0 && b.condition >= 0.4);
   }
 
+  /** Theatres with a show actually running tonight. */
+  private showingTheatres(s: ReturnType<typeof useTDStore.getState>): PlacedBuilding[] {
+    return this.operationalTheatres(s).filter((t) => s.productions[t.id]?.stage === 'running');
+  }
+
   private onPreshow(s: ReturnType<typeof useTDStore.getState>): void {
-    // Every operational theatre runs tonight; new houses get a show.
-    for (const t of this.operationalTheatres(s)) {
-      if (!s.productions[t.id]) s.assignShow(t.id, generateShowTitle());
-    }
-    this.onIgnite?.();
+    if (this.showingTheatres(s).length > 0) this.onIgnite?.();
   }
 
   private onCurtain(s: ReturnType<typeof useTDStore.getState>): void {
     const { field, cols } = getBuzzField(s.street, s.upkeep);
-    for (const t of this.operationalTheatres(s)) {
-      const show = s.productions[t.id];
-      if (!show) continue;
-      const capacity = THEATRES[t.kind as keyof typeof THEATRES].capacity;
+    for (const t of this.showingTheatres(s)) {
+      const p = s.productions[t.id];
+      if (!p || !p.show) continue;
+      const fx = upgradeEffects(t.upgrades);
+      const capacity = Math.round(THEATRES[t.kind as keyof typeof THEATRES].capacity * fx.capacityMult);
       const doorX = t.x + Math.floor(THEATRES[t.kind as keyof typeof THEATRES].width / 2);
       const doorY = sidewalkRowFor(t.side);
       const doorBuzz = field[doorY * cols + doorX] ?? 0;
 
+      // Demographics + ticket elasticity scale the buzz-driven walk-ins.
+      const refPrice = PRODUCTION.REF_TICKET[t.kind] ?? 35;
+      const tolerance = mixPriceTolerance(s.time.day);
+      const appetite = genreAppetite(s.time.day, p.show.genre);
+      const elasticity = priceDemand(p.ticketPrice, refPrice, tolerance);
+      const effectiveBuzz = (doorBuzz + fx.attendanceBonus) * appetite * elasticity;
+
       const { admitted } = crowd.admit(t.id, capacity);
-      const attendance = attendanceFor(admitted, doorBuzz, capacity, show.momentum);
+      const attendance = attendanceFor(admitted, effectiveBuzz, capacity, p.momentum);
       s.recordNightly(t.id, attendance);
     }
   }
@@ -93,17 +106,31 @@ export class ShowtimeDirector {
   private onPostshow(s: ReturnType<typeof useTDStore.getState>): void {
     let total = 0;
     const titles: string[] = [];
-    for (const t of this.operationalTheatres(s)) {
-      const show = s.productions[t.id];
-      if (!show || show.lastAttendance === 0) continue;
-      const capacity = THEATRES[t.kind as keyof typeof THEATRES].capacity;
-      const revenue = show.lastAttendance * show.ticketPrice;
+    for (const t of this.showingTheatres(s)) {
+      const p = s.productions[t.id];
+      if (!p || !p.show || p.lastAttendance === 0) continue;
+      const fx = upgradeEffects(t.upgrades);
+      const capacity = Math.round(THEATRES[t.kind as keyof typeof THEATRES].capacity * fx.capacityMult);
+      const refPrice = PRODUCTION.REF_TICKET[t.kind] ?? 35;
+      const tolerance = mixPriceTolerance(s.time.day);
+      // VIP lounge premium rides on top of the set price; the house bar takes
+      // its cut of the whole night.
+      const perTicket = p.ticketPrice + fx.ticketPremium;
+      const revenue = Math.round(p.lastAttendance * perTicket * (1 + fx.takingsCut));
       total += revenue;
-      titles.push(`${show.title} $${revenue.toLocaleString()}`);
+      titles.push(`${p.show.title} $${revenue.toLocaleString()}`);
 
-      const fillRate = show.lastAttendance / capacity;
-      const goodShow = show.quality >= 62;
-      s.updateMomentum(t.id, nextMomentum(show.momentum, show.quality, fillRate));
+      const fillRate = p.lastAttendance / capacity;
+      const goodShow = p.quality >= 62;
+      let momentum = nextMomentum(p.momentum, p.quality, fillRate);
+      // Restrooms upgrade removes the quiet drag on word of mouth.
+      if (fx.wordOfMouthFloor) momentum = Math.max(momentum, 0.85);
+      // Green-room upgrade slows momentum decay.
+      momentum = p.momentum + (momentum - p.momentum) * fx.momentumDecayMult;
+      // Gouging penalty — overprice a hit and word of mouth dies for it.
+      if (isGouging(p.ticketPrice, refPrice, tolerance)) momentum -= 0.04;
+      momentum = Math.min(1.6, Math.max(0.55, momentum));
+      s.updateMomentum(t.id, momentum);
 
       const doorX = t.x + Math.floor(THEATRES[t.kind as keyof typeof THEATRES].width / 2);
       crowd.release(t.id, doorX, t.side, goodShow);
@@ -111,6 +138,7 @@ export class ShowtimeDirector {
     if (total > 0) {
       s.addCash(total);
       pushToast(`Box office — ${titles.join(' · ')}`, 'money');
+      this.onApplause?.();
     }
   }
 

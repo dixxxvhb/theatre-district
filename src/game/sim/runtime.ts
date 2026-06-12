@@ -73,5 +73,5 @@ export function resetSims(): void {
 
 // Dev-server-only sim handle (QA scripts; see store.ts for the store handle).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  (window as unknown as { __tdSim?: object }).__tdSim = { crowd, runtime };
+  (window as unknown as { __tdSim?: object }).__tdSim = { crowd, runtime, showtime };
 }

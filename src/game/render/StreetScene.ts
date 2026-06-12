@@ -99,6 +99,13 @@ export class StreetScene {
     this.minLightX = min === Infinity ? 0 : min;
   }
 
+  /** Polish pulse: a quick brightness flare on every light, like applause. */
+  applauseFlash(): void {
+    this.applauseStart = this.elapsed;
+  }
+  private applauseStart: number | null = null;
+  private readonly APPLAUSE_MS = 600;
+
   constructor(baker: Baker, kit: TextureKit) {
     this.kit = kit;
     this.theatreBakes = {
@@ -196,17 +203,31 @@ export class StreetScene {
     this.lights.alpha = grade.lights;
     this.elapsed += dtMs;
 
+    // Applause flash overrides everything briefly.
+    if (this.applauseStart !== null) {
+      const since = this.elapsed - this.applauseStart;
+      const t = Math.min(1, since / this.APPLAUSE_MS);
+      const boost = 1 + Math.sin(Math.PI * t) * 0.55;
+      for (const c of this.lights.children) {
+        const tagged = c as Container & { __baseAlpha?: number };
+        c.alpha = (tagged.__baseAlpha ?? c.alpha) * boost;
+      }
+      if (t >= 1) this.applauseStart = null;
+    }
     // Marquee-ignition cascade: each light steps on by street position.
-    if (this.ignitionStart !== null) {
+    else if (this.ignitionStart !== null) {
       const since = this.elapsed - this.ignitionStart;
       let allOn = true;
+      // Apply a tiny overshoot when each light lands — that "tink" beat.
+      const overshoot = (f: number) => (f < 1 ? f : f < 1.1 ? 1.4 - 4 * (f - 1) : 1);
       for (const c of this.lights.children) {
         const tagged = c as Container & { __baseAlpha?: number };
         const base = tagged.__baseAlpha ?? c.alpha;
         const delay = ((c.x - this.minLightX) / ISO.TILE_WIDTH) * SHOWTIME.IGNITION_MS_PER_COLUMN;
-        const f = Math.min(Math.max((since - delay) / SHOWTIME.IGNITION_RAMP_MS, 0), 1);
-        c.alpha = base * f;
-        if (f < 1) allOn = false;
+        const f = (since - delay) / SHOWTIME.IGNITION_RAMP_MS;
+        const clamped = Math.min(Math.max(f, 0), 1.1);
+        c.alpha = base * overshoot(clamped);
+        if (clamped < 1) allOn = false;
       }
       if (allOn) this.ignitionStart = null;
     } else if (this.animateFlicker) {

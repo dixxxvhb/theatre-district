@@ -216,6 +216,131 @@ export const SHOWTIME = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// PRODUCTION — the Desk pipeline: commission → cast → rehearse → run.
+// Tuned so the first full production lands ~$20–25k all-in [LOCKED anchor].
+// ---------------------------------------------------------------------------
+export const PRODUCTION = {
+  /** Drafting three script options costs this once per commission. */
+  COMMISSION_COST: 1_500,
+  /** Rights cost by archetype (the spread IS the risk profile). */
+  RIGHTS_COST: {
+    crowd_pleaser: 6_000,
+    safe_bet: 5_000,
+    critics_darling: 7_000,
+    big_spectacle: 10_000,
+    intimate_chamber: 4_000,
+    dark_horse: 3_000,
+  } as Record<string, number>,
+  /** Cast signing fee multiplier on (skill+starPower); daily wage fraction. */
+  SIGNING_PER_POINT: 28,
+  DAILY_WAGE_PER_POINT: 1.1,
+  /** Rehearsal: base readiness gained per day; opening allowed at threshold. */
+  REHEARSAL_PER_DAY: 9,
+  OPEN_THRESHOLD: 70,
+  /** Readiness above threshold converts to a small quality bonus at opening. */
+  POLISH_QUALITY_PER_POINT: 0.15,
+  /** A director decision lands roughly every N rehearsal days. */
+  DECISION_EVERY_DAYS: 4,
+  /** Opening-night staging cost. */
+  OPENING_COST: 2_000,
+  /** Lifecycle: cheap-ticket preview nights before the official opening. */
+  PREVIEW_DAYS: 3,
+  PREVIEW_PRICE_MULT: 0.5,
+  /** Forced closing: fill below this for FORCED_CLOSE_NIGHTS straight nights. */
+  FORCED_CLOSE_FILL: 0.1,
+  FORCED_CLOSE_NIGHTS: 5,
+  /** A run this long earns a farewell-crowd send-off when it closes. */
+  FAREWELL_RUN_DAYS: 28,
+  /** Daily chance of a street/theatre event. */
+  EVENT_CHANCE: 0.22,
+  /** Quality formula weights (sum with base; clamped 0–100). */
+  QUALITY_BASE: 22,
+  QUALITY_SCRIPT_WEIGHT: 0.32,
+  QUALITY_CAST_WEIGHT: 0.38,
+  /** Reference ticket prices by theatre tier (elasticity anchors, S6). */
+  REF_TICKET: { theatre_playhouse: 35, theatre_midhouse: 45, theatre_grand: 60 } as Record<string, number>,
+} as const;
+
+// ---------------------------------------------------------------------------
+// THEATRE UPGRADES — the old 15 room types as purchasable bonuses (audit §5),
+// plus the spec's Fly System. Effects feed real formulas via upgradeEffects().
+// ---------------------------------------------------------------------------
+export interface UpgradeDef {
+  label: string;
+  cost: number;
+  desc: string;
+}
+
+export const UPGRADES = {
+  grand_lobby:      { label: 'Grand Lobby', cost: 9_000, desc: 'A gathering place worth arriving early for. Theatre radiates more buzz.' },
+  modern_box_office:{ label: 'Modern Box Office', cost: 5_000, desc: 'Faster lines, fuller houses. Small attendance boost.' },
+  house_expansion:  { label: 'House Expansion', cost: 14_000, desc: 'More seats in the same bones. +15% capacity.' },
+  stage_renovation: { label: 'Stage Renovation', cost: 12_000, desc: 'A stage worthy of ambition. Raises show quality.' },
+  backstage_complex:{ label: 'Backstage Complex', cost: 8_000, desc: 'Quick changes, calm crew. The building ages slower.' },
+  star_dressing:    { label: 'Star Dressing Rooms', cost: 6_000, desc: 'Stars say yes to comfort. Better casting candidates.' },
+  orchestra_pit:    { label: 'Orchestra Pit', cost: 9_000, desc: 'Live music under the stage. Big bonus for musicals.' },
+  rehearsal_hall:   { label: 'Rehearsal Hall', cost: 10_000, desc: 'Dedicated space. Rehearsals progress 50% faster.' },
+  vip_lounge:       { label: 'VIP Lounge', cost: 12_000, desc: 'Champagne before curtain. Premium on every ticket.' },
+  house_bar:        { label: 'House Bar & Concessions', cost: 7_000, desc: 'Intermission pours. A cut of every night adds up.' },
+  scenic_storage:   { label: 'Scenic Storage', cost: 4_000, desc: 'Sets live to fight again. Cheaper future productions.' },
+  production_office:{ label: 'Production Office', cost: 5_000, desc: 'Paperwork tamed. Commissioning costs halved.' },
+  tech_booth:       { label: 'Lighting & Sound Booth', cost: 8_000, desc: 'Cues land crisp. Raises show quality.' },
+  green_room:       { label: 'Green Room', cost: 6_000, desc: 'A calm cast is a consistent cast. Momentum decays slower.' },
+  restrooms:        { label: 'Renovated Restrooms', cost: 4_000, desc: 'Civilization. Removes the quiet drag on word of mouth.' },
+  fly_system:       { label: 'Fly System', cost: 15_000, desc: 'Scenery that soars. Unlocks true spectacle staging.' },
+} as const satisfies Record<string, UpgradeDef>;
+
+export type UpgradeId = keyof typeof UPGRADES;
+
+// ---------------------------------------------------------------------------
+// SEASONS & WEATHER (Session 7)
+// ---------------------------------------------------------------------------
+export const SEASON_MOD: Record<string, { crowd: number; tickets: number }> = {
+  // Spring: Tony season — prestige weight up, critics circling. Standard crowd.
+  spring: { crowd: 1.0, tickets: 1.05 },
+  // Summer: tourist flood. Higher volume, taste blunter.
+  summer: { crowd: 1.25, tickets: 1.0 },
+  // Fall: new-season openings. Standard.
+  fall: { crowd: 1.0, tickets: 1.0 },
+  // Winter: the slump.
+  winter: { crowd: 0.75, tickets: 0.92 },
+};
+
+export type WeatherKind = 'clear' | 'rain' | 'heat';
+
+export const WEATHER = {
+  /** Daily roll: chances of rain/heat by season. Everything else is clear. */
+  CHANCES: {
+    spring: { rain: 0.18, heat: 0.0 },
+    summer: { rain: 0.12, heat: 0.28 },
+    fall: { rain: 0.22, heat: 0.0 },
+    winter: { rain: 0.18, heat: 0.0 },
+  } as Record<string, { rain: number; heat: number }>,
+  /** Crowd multipliers by weather kind. */
+  CROWD_MULT: { clear: 1.0, rain: 0.7, heat: 0.85 } as Record<WeatherKind, number>,
+  /** Indoor amenities surge in rain; carts surge in heat. */
+  BAR_SURGE_RAIN: 1.5,
+  CART_SURGE_HEAT: 1.55,
+} as const;
+
+// ---------------------------------------------------------------------------
+// DARK WEEK (Session 7)
+// ---------------------------------------------------------------------------
+export const DARK_WEEK = {
+  /** Triggers when cash ≤ this. */
+  TRIGGER_CASH: 0,
+  /** Days the street stays in Dark Week before the rescue offer arrives. */
+  GRACE_DAYS: 3,
+  /** Patron rescue grant (once per era). */
+  RESCUE_AMOUNT: 12_000,
+} as const;
+
+// ---------------------------------------------------------------------------
+// MAINTENANCE REPAIR (Session 7) — quick condition fix for the selection card.
+// ---------------------------------------------------------------------------
+export const REPAIR_COST_PER_POINT = 80; // $80 per missing percent of condition
+
+// ---------------------------------------------------------------------------
 // ECONOMY  [LOCKED anchors; exact curve numbers are tunable]
 // ---------------------------------------------------------------------------
 export const ECONOMY = {

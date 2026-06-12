@@ -22,6 +22,7 @@ import { getBuzzField } from '../sim/buzzCache';
 import { bakeFigures, CrowdView } from './CrowdView';
 import { showtime } from '../sim/showtime';
 import { thoughtFor } from '../data/peepThoughts';
+import { WeatherFX } from './kit/weather';
 
 export interface PeepThought {
   text: string;
@@ -65,11 +66,19 @@ export function DistrictCanvas({
       const grain = new Grain(kit);
 
       engine.app.stage.addChildAt(sky.container, 0);
-      engine.world.addChild(scene.dim, scene.lights, scene.overlay);
-      engine.app.stage.addChild(grain.sprite);
+      const weatherFX = new WeatherFX(
+        kit,
+        () => engine.app.screen.width,
+        () => engine.app.screen.height,
+      );
+      // Reflection sheen sits in world (graded with night). Rain streaks
+      // sit on the stage (always visible, never panned).
+      engine.world.addChild(scene.dim, weatherFX.reflectionSheen, scene.lights, scene.overlay);
+      engine.app.stage.addChild(grain.sprite, weatherFX.container);
 
       const crowdView = new CrowdView(scene.objectLayer, bakeFigures(baker));
       showtime.onIgnite = () => scene.ignite();
+      showtime.onApplause = () => scene.applauseFlash();
 
       camera = new StreetCamera(engine.world, engine.app.canvas);
       interaction = new StreetInteraction(engine.app.canvas, scene, (sx, sy) => {
@@ -97,8 +106,10 @@ export function DistrictCanvas({
 
       syncAll();
       fitToEra(useTDStore.getState().street.era);
+      weatherFX.setWeather(useTDStore.getState().weather);
       unsub = useTDStore.subscribe((s, prev) => {
         if (s.street.era !== prev.street.era) fitToEra(s.street.era);
+        if (s.weather !== prev.weather) weatherFX.setWeather(s.weather);
         if (
           s.street !== prev.street ||
           s.upkeep !== prev.upkeep ||
@@ -117,11 +128,14 @@ export function DistrictCanvas({
         const s = useTDStore.getState();
         const t = s.time.tickOfDay / TIME.TICKS_PER_DAY;
         const grade = gradeAt(t);
+        // Dark Week dims the street's lights (spec: "lights dim").
+        if (s.darkWeekDays > 0) grade.lights *= 0.55;
         const { width, height } = engine.app.screen;
         scene.update(grade, deltaMS);
         crowdView.sync(performance.now());
         sky.update(grade, width, height);
         grain.update(deltaMS, width, height);
+        weatherFX.update(deltaMS);
 
         // Buzz readout under the cursor when the overlay is on.
         if (onHoverBuzz) {
@@ -147,6 +161,7 @@ export function DistrictCanvas({
     return () => {
       cancelled = true;
       showtime.onIgnite = null;
+      showtime.onApplause = null;
       document.removeEventListener('visibilitychange', onVisibility);
       unsub?.();
       interaction?.destroy();

@@ -48,6 +48,8 @@ export interface PlacedBuilding {
   constructionDaysLeft: number;
   /** 0..1 maintenance condition (Session 7 wires aging). */
   condition: number;
+  /** Purchased Theatre Upgrades (theatres only). */
+  upgrades?: string[];
 }
 
 export interface PlacedDecoration {
@@ -90,16 +92,67 @@ export interface SettingsState {
   buzzOverlay: boolean;
 }
 
-/** Session-4 simplified production — one running show per theatre. The full
- *  Production Desk (Session 5) replaces the source; the shape persists. */
-export interface SimpleShow {
+// --- Production Desk (Session 5) ---------------------------------------------
+
+export type ProductionStage = 'commissioning' | 'casting' | 'rehearsing' | 'previews' | 'running';
+
+export type RoleSlot = 'lead' | 'second' | 'featured' | 'ensemble';
+
+export interface CastMember {
+  id: string;
+  name: string;
+  skill: number; // 0–100
+  starPower: number; // 0–100
+  personality: string;
+  /** One-time signing fee + daily wage, both derived from the numbers above. */
+  signingFee: number;
+  dailyWage: number;
+}
+
+export interface ShowDraft {
   title: string;
-  /** 0–100 — drives word-of-mouth and (later) reviews. */
+  genre: string;
+  archetype: string;
+  archetypeLabel: string;
+  scriptQuality: number; // 0–100
+  appeal: number; // 0–100
+  rightsCost: number;
+}
+
+/** One theatre's production, through the whole pipeline. */
+export interface Production {
+  stage: ProductionStage;
+  /** Three drafts to choose from while commissioning. */
+  options?: ShowDraft[];
+  show?: ShowDraft;
+  cast: Partial<Record<RoleSlot, CastMember>>;
+  /** Casting pool per role, regenerated on demand. */
+  candidates?: Partial<Record<RoleSlot, CastMember[]>>;
+  readiness: number; // 0–100 while rehearsing
+  rehearsalDays: number;
+  usedDecisionIds: string[];
+  /** Accumulated quality effects from director decisions (applied at opening). */
+  qualityNudge: number;
+  /** Set once at opening from script + cast + upgrades + polish. */
   quality: number;
-  /** Word-of-mouth multiplier on attendance (MOMENTUM_MIN..MAX). */
   momentum: number;
   ticketPrice: number;
   lastAttendance: number;
+  /** Cumulative box office for this show's run. */
+  gross: number;
+  runDays: number;
+  /** Lifecycle (Session 6): cheap-ticket preview nights before opening. */
+  previewDays: number;
+  /** Opening-night verdicts from the three critics. */
+  reviews?: Array<{ critic: string; stars: number; line: string }>;
+  /** Consecutive nights under the forced-closing fill threshold. */
+  belowParNights: number;
+}
+
+/** A pending director decision — gameplay-pausing (spec: decision modals auto-pause). */
+export interface PendingDecision {
+  theatreId: string;
+  decisionId: string;
 }
 
 export interface TDState {
@@ -110,6 +163,34 @@ export interface TDState {
   street: StreetState;
   upkeep: UpkeepState;
   /** Keyed by theatre building id. */
-  productions: Record<string, SimpleShow>;
+  productions: Record<string, Production>;
+  /** Auto-pauses the game until answered. */
+  pendingDecision: PendingDecision | null;
+  /** Daily-event modal (auto-pauses); passive events apply instantly. */
+  pendingEvent: { eventId: string; theatreId?: string } | null;
+  /** Temporary street-wide modifiers from events (festival crowds etc.). */
+  dayMods: { spawnMult: number; untilDay: number } | null;
+  /** The Daily Playbill — newest first, last 7 days. */
+  playbill: PlaybillEntry[];
+  /** Today's weather (Session 7). */
+  weather: 'clear' | 'rain' | 'heat';
+  /** Dark Week status (Session 7). 0 = not in Dark Week. */
+  darkWeekDays: number;
+  /** Per-era flag: has the patron rescue been used in this era? */
+  patronRescueUsedEra: number;
+  /** Teach cards already fired (by id). */
+  seenTeachCards: string[];
+  /** Teach card showing right now (front of the queue). */
+  pendingTeachCardId: string | null;
+  /** Once-only authored intro is dismissed. */
+  introCompleted: boolean;
+  /** Once-only finale Gala is played. */
+  finalePlayed: boolean;
   settings: SettingsState;
+}
+
+export interface PlaybillEntry {
+  day: number;
+  headline: string;
+  lines: string[];
 }

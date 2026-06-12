@@ -12,7 +12,7 @@ export interface EventDefinition {
   }[];
 }
 
-const EVENT_DEFINITIONS: EventDefinition[] = [
+export const EVENT_DEFINITIONS: EventDefinition[] = [
   // ================================================================
   // POSITIVE EVENTS
   // ================================================================

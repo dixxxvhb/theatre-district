@@ -11,9 +11,18 @@ import type { Speed } from './game/sim/clock';
 import { resetSims } from './game/sim/runtime';
 import { mostRecentSave } from './store/saves';
 import { useTDStore } from './store/store';
+import { Almanac } from './ui/Almanac';
 import { BuildPalette } from './ui/BuildPalette';
 import { NotificationToast } from './ui/components/NotificationToast';
+import { DecisionModal } from './ui/desk/DecisionModal';
+import { EventModal } from './ui/desk/EventModal';
+import { ProductionDesk } from './ui/desk/ProductionDesk';
+import { EraPanel } from './ui/EraPanel';
+import { Finale } from './ui/Finale';
+import { Intro } from './ui/Intro';
+import { Playbill } from './ui/Playbill';
 import { SelectionCard } from './ui/SelectionCard';
+import { TeachCardModal } from './ui/TeachCardModal';
 import { DevPanel, devEnabled } from './ui/dev/DevPanel';
 import { SaveMenu } from './ui/SaveMenu';
 
@@ -87,6 +96,28 @@ function TitleScreen() {
   );
 }
 
+function PulsingCash({ cash }: { cash: number }) {
+  const [pulse, setPulse] = useState(false);
+  const [lastCash, setLastCash] = useState(cash);
+  useEffect(() => {
+    if (cash > lastCash) {
+      setPulse(true);
+      const t = setTimeout(() => setPulse(false), 700);
+      setLastCash(cash);
+      return () => clearTimeout(t);
+    }
+    setLastCash(cash);
+  }, [cash, lastCash]);
+  return (
+    <span
+      className={`font-mono text-sm transition-colors duration-300 ${pulse ? 'text-emerald-300' : 'text-amber-200'}`}
+      style={{ textShadow: pulse ? '0 0 18px rgba(110,231,183,0.6)' : 'none' }}
+    >
+      ${cash.toLocaleString()}
+    </span>
+  );
+}
+
 function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
   const districtName = useTDStore((s) => s.districtName);
   const day = useTDStore((s) => s.time.day);
@@ -106,9 +137,11 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
         <span className="rounded border border-gray-800/40 bg-gray-900/60 px-2 py-0.5 text-xs text-gray-500">
           {PHASE_LABELS[phase]}
         </span>
+        <WeatherChip />
+        <DarkWeekChip />
       </div>
       <div className="flex items-center gap-3">
-        <span className="font-mono text-sm text-amber-200">${cash.toLocaleString()}</span>
+        <PulsingCash cash={cash} />
         <div className="flex items-center gap-1">
           <button
             onClick={togglePause}
@@ -137,6 +170,8 @@ function TopBar({ onOpenSaves }: { onOpenSaves: () => void }) {
           ))}
         </div>
         <BuildButton />
+        <AlmanacButton />
+        <PlaybillButton />
         <button
           onClick={onOpenSaves}
           className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
@@ -164,12 +199,87 @@ function BuildButton() {
   );
 }
 
+function WeatherChip() {
+  const weather = useTDStore((s) => s.weather);
+  const label = weather === 'clear' ? '' : weather === 'rain' ? '☂ Rain' : '☼ Heat';
+  if (!label) return null;
+  return (
+    <span className="rounded border border-amber-900/40 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-200">
+      {label}
+    </span>
+  );
+}
+
+function DarkWeekChip() {
+  const dark = useTDStore((s) => s.darkWeekDays);
+  const era = useTDStore((s) => s.street.era);
+  const used = useTDStore((s) => s.patronRescueUsedEra);
+  const accept = useTDStore((s) => s.acceptPatronRescue);
+  if (dark === 0) return null;
+  const rescueAvailable = used !== era;
+  return (
+    <span className="flex items-center gap-1 rounded border border-red-900/40 bg-red-950/40 px-2 py-0.5 text-xs text-red-200">
+      Dark Week · day {dark}
+      {rescueAvailable && dark >= 3 && (
+        <button
+          onClick={accept}
+          className="ml-1 rounded border border-amber-700 bg-amber-950/60 px-1.5 py-0.5 text-[10px] text-amber-100 hover:bg-amber-900/60"
+        >
+          Accept patron rescue ($12k)
+        </button>
+      )}
+    </span>
+  );
+}
+
+function AlmanacButton() {
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new CustomEvent('td:open-almanac'))}
+      title="H"
+      className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
+    >
+      Almanac
+    </button>
+  );
+}
+
+function PlaybillButton() {
+  const count = useTDStore((s) => s.playbill.length);
+  // Open via parent — emit a global event since this lives inside TopBar's tree.
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new CustomEvent('td:open-playbill'))}
+      title="P"
+      className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800"
+    >
+      Playbill{count > 0 ? ` (${Math.min(count, 99)})` : ''}
+    </button>
+  );
+}
+
 export default function App() {
   const initialized = useTDStore((s) => s.initialized);
   const paletteOpen = useTDStore((s) => s.ui.paletteOpen);
   const [savesOpen, setSavesOpen] = useState(false);
+  const [playbillOpen, setPlaybillOpen] = useState(false);
+  const [almanacOpen, setAlmanacOpen] = useState(false);
+  const [photoMode, setPhotoMode] = useState(false);
   const [hoverBuzz, setHoverBuzz] = useState<string | null>(null);
   const [thought, setThought] = useState<PeepThought | null>(null);
+  useEffect(() => {
+    const onOpenPlaybill = () => setPlaybillOpen(true);
+    const onOpenAlmanac = () => setAlmanacOpen(true);
+    const onTogglePhoto = () => setPhotoMode((m) => !m);
+    window.addEventListener('td:open-playbill', onOpenPlaybill);
+    window.addEventListener('td:open-almanac', onOpenAlmanac);
+    window.addEventListener('td:toggle-photo', onTogglePhoto);
+    return () => {
+      window.removeEventListener('td:open-playbill', onOpenPlaybill);
+      window.removeEventListener('td:open-almanac', onOpenAlmanac);
+      window.removeEventListener('td:toggle-photo', onTogglePhoto);
+    };
+  }, []);
   const onHoverBuzz = useCallback((label: string | null) => setHoverBuzz(label), []);
   const onThought = useCallback((t: PeepThought) => {
     setThought(t);
@@ -191,8 +301,15 @@ export default function App() {
       else if (e.key === 'Tab') {
         e.preventDefault();
         s.toggleBuzzOverlay();
+      } else if (e.key === 'p' || e.key === 'P') {
+        window.dispatchEvent(new CustomEvent('td:toggle-photo'));
+      } else if (e.key === 'h' || e.key === 'H') {
+        window.dispatchEvent(new CustomEvent('td:open-almanac'));
+      } else if (e.key === 'n' || e.key === 'N') {
+        window.dispatchEvent(new CustomEvent('td:open-playbill'));
       } else if (e.key === 'Escape') {
-        if (s.ui.tool) s.setTool(null);
+        if (s.ui.deskTheatreId) s.openDesk(null);
+        else if (s.ui.tool) s.setTool(null);
         else if (s.ui.selectedId) s.select(null);
       }
     };
@@ -211,11 +328,12 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col bg-[#0a0d18]">
-      <TopBar onOpenSaves={() => setSavesOpen(true)} />
+      {!photoMode && <TopBar onOpenSaves={() => setSavesOpen(true)} />}
       <div className="relative flex-1">
         <DistrictCanvas onHoverBuzz={onHoverBuzz} onThought={onThought} />
-        {paletteOpen && <BuildPalette />}
-        <SelectionCard />
+        {!photoMode && <EraPanel />}
+        {!photoMode && paletteOpen && <BuildPalette />}
+        {!photoMode && <SelectionCard />}
         {hoverBuzz !== null && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-20 -translate-x-1/2 rounded border border-amber-900/40 bg-gray-950/90 px-2 py-1 font-mono text-xs text-amber-200">
             Buzz {hoverBuzz}
@@ -231,9 +349,22 @@ export default function App() {
           </div>
         )}
       </div>
-      {savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
-      <NotificationToast />
-      {devEnabled() && <DevPanel />}
+      {!photoMode && <ProductionDesk />}
+      {!photoMode && <DecisionModal />}
+      {!photoMode && <EventModal />}
+      {!photoMode && <TeachCardModal />}
+      <Intro />
+      <Finale />
+      {!photoMode && playbillOpen && <Playbill onClose={() => setPlaybillOpen(false)} />}
+      {!photoMode && almanacOpen && <Almanac onClose={() => setAlmanacOpen(false)} />}
+      {!photoMode && savesOpen && <SaveMenu onClose={() => setSavesOpen(false)} />}
+      {!photoMode && <NotificationToast />}
+      {!photoMode && devEnabled() && <DevPanel />}
+      {photoMode && (
+        <div className="pointer-events-auto fixed bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-amber-900/40 bg-gray-950/85 px-3 py-1.5 text-xs text-amber-200 backdrop-blur-sm">
+          Photo mode — press P to return
+        </div>
+      )}
     </div>
   );
 }
